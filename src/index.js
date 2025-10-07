@@ -2,91 +2,183 @@
 import restCfWorker from 'cloudflare-worker-rest-api'
 const app = new restCfWorker()
 
+// Helper functions for consistent responses and error handling
+const JSON_HEADERS = { 'Content-Type': 'application/json' }
+
+function jsonResponse(body, status = 200, extraHeaders = {}) {
+  const headers = new Headers({ ...JSON_HEADERS, ...extraHeaders })
+  return new Response(JSON.stringify(body), { status, headers })
+}
+
+function safeJsonParse(raw) {
+  try {
+    return JSON.parse(raw)
+  } catch (err) {
+    console.error('JSON parse error:', err.message)
+    return null
+  }
+}
+
+function validateAppId(appId) {
+  if (!appId || typeof appId !== 'string') return false
+  // Allow letters, numbers, dashes and underscores; max length to avoid abuse
+  return /^[A-Za-z0-9-_]{1,64}$/.test(appId)
+}
+
+function ensureEvergreenBinding() {
+  if (typeof EVERGREEN === 'undefined') {
+    console.error('EVERGREEN KV binding is not available')
+    return false
+  }
+  return true
+}
+
 // Returns data for a specific app
 app.get("/app/:appId", async (req, res) => {
-  const word = req.params.appId;
-  console.log("get app: " + word + ".");
+  if (!ensureEvergreenBinding()) {
+    return jsonResponse({ message: 'Server configuration error' }, 500)
+  }
 
-  let data = await EVERGREEN.get(word.toLowerCase());
+  const rawAppId = req.params?.appId
+  if (!validateAppId(rawAppId)) {
+    return jsonResponse({ message: 'Invalid application name' }, 400)
+  }
 
-  if (data === null) {
-    console.log("No data found.");
-    let headers = new Headers();
-    headers.set('Content-Type', 'application/json');
-    return new Response('{message: "Application not found. List all apps for valid application names. Application names are case sensitive.}', {
-      status: 404,
-      headers: headers
-    });
-  } else {
-    console.log("Return data for: " + word);
-    return res.send(JSON.parse(data));
+  // Convert to lowercase for consistent key lookup
+  const key = rawAppId.toLowerCase()
+  console.log("Fetching app:", key)
+
+  try {
+    const data = await EVERGREEN.get(key)
+
+    if (data === null) {
+      console.log("No data found for app:", key)
+      return jsonResponse({
+        message: 'Application not found. Call /apps for available application names.'
+      }, 404)
+    }
+
+    const parsed = safeJsonParse(data)
+    if (parsed === null) {
+      console.error(`Invalid JSON data for app: ${key}`)
+      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
+    }
+
+    console.log("Returning data for app:", key)
+    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+
+  } catch (err) {
+    console.error('Error fetching app data:', err)
+    return jsonResponse({ message: 'Internal server error' }, 500)
   }
 });
 
 // Returns data for all supported apps
 app.get("/apps", async (req, res) => {
+  if (!ensureEvergreenBinding()) {
+    return jsonResponse({ message: 'Server configuration error' }, 500)
+  }
+
   console.log("get all apps.")
-  console.log(req.params)
 
-  let data = await EVERGREEN.get("_allapps");
+  try {
+    const data = await EVERGREEN.get("_allapps")
 
-  if (data === null) {
-    console.log("No data found.");
-  } else {
-    return res.send(JSON.parse(data));
+    if (data === null) {
+      console.log("No data found.")
+      return jsonResponse({ message: 'No apps available' }, 404)
+    }
+
+    const parsed = safeJsonParse(data)
+    if (parsed === null) {
+      console.error('Invalid JSON data for _allapps')
+      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
+    }
+
+    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+
+  } catch (err) {
+    console.error('Error fetching apps list:', err)
+    return jsonResponse({ message: 'Internal server error' }, 500)
   }
 });
 
 // Return a message if someone calls /endpoints
 app.get('/endpoints', async (req, res) => {
   console.log(req);
-  let headers = new Headers();
-  headers.set('Content-Type', 'application/json');
-  
-  return new Response('{message: "Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.}', {
-    status: 404,
-    headers: headers
-  });
+  return jsonResponse({
+    message: 'Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.'
+  }, 404);
 });
 
 // Returns endpoints data for URLs used by Evergreen when finding application versions
 app.get("/endpoints/versions", async (req, res) => {
+  if (!ensureEvergreenBinding()) {
+    return jsonResponse({ message: 'Server configuration error' }, 500)
+  }
+
   console.log("get endpoints from Evergreen manifests.")
   console.log(req.params)
 
-  let data = await EVERGREEN.get("endpoints-versions");
+  try {
+    const data = await EVERGREEN.get("endpoints-versions")
 
-  if (data === null) {
-    console.log("No data found.");
-  } else {
-    return res.send(JSON.parse(data));
+    if (data === null) {
+      console.log("No data found.")
+      return jsonResponse({ message: 'No endpoints data available' }, 404)
+    }
+
+    const parsed = safeJsonParse(data)
+    if (parsed === null) {
+      console.error('Invalid JSON data for endpoints-versions')
+      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
+    }
+
+    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+
+  } catch (err) {
+    console.error('Error fetching endpoints-versions:', err)
+    return jsonResponse({ message: 'Internal server error' }, 500)
   }
 });
 
 // Returns endpoints data for URLs used by Evergreen to download application installers with Save-EvergreenApp
 app.get("/endpoints/downloads", async (req, res) => {
+  if (!ensureEvergreenBinding()) {
+    return jsonResponse({ message: 'Server configuration error' }, 500)
+  }
+
   console.log("get endpoints from downloads returned by Evergreen.")
   console.log(req.params)
 
-  let data = await EVERGREEN.get("endpoints-downloads");
+  try {
+    const data = await EVERGREEN.get("endpoints-downloads")
 
-  if (data === null) {
-    console.log("No data found.");
-  } else {
-    return res.send(JSON.parse(data));
+    if (data === null) {
+      console.log("No data found.")
+      return jsonResponse({ message: 'No endpoints data available' }, 404)
+    }
+
+    const parsed = safeJsonParse(data)
+    if (parsed === null) {
+      console.error('Invalid JSON data for endpoints-downloads')
+      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
+    }
+
+    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+
+  } catch (err) {
+    console.error('Error fetching endpoints-downloads:', err)
+    return jsonResponse({ message: 'Internal server error' }, 500)
   }
 });
 
 // Return data for /*
 app.get('/', async (req, res) => {
   console.log(req);
-  let headers = new Headers();
-  headers.set('Content-Type', 'application/json');
-  
-  return new Response('{message: "Method not found. Call /apps for available applications.}', {
-    status: 404,
-    headers: headers
-  });
+  return jsonResponse({
+    message: 'Method not found. Call /apps for available applications.'
+  }, 404);
 });
 
 // Responder
