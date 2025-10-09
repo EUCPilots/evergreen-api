@@ -118,7 +118,7 @@ app.get('/endpoints', async (req, res) => {
   return jsonResponse({
     message: 'Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.',
     documentation: 'https://eucpilots.com/evergreen-docs/api/'
-  }, 404);
+  }, 404)
 });
 
 // Returns endpoints data for URLs used by Evergreen when finding application versions
