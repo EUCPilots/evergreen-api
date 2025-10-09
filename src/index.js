@@ -47,7 +47,7 @@ app.get("/app/:appId", async (req, res) => {
     return jsonResponse({ message: 'Server configuration error' }, 500)
   }
 
-  const rawAppId = req.params?.appId
+  const rawAppId = req.params.appId
   if (!validateAppId(rawAppId)) {
     return jsonResponse({
       message: 'Invalid application name. Call /apps for a list of available applications.',
