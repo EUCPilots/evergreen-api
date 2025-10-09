@@ -49,7 +49,10 @@ app.get("/app/:appId", async (req, res) => {
 
   const rawAppId = req.params?.appId
   if (!validateAppId(rawAppId)) {
-    return jsonResponse({ message: 'Invalid application name. Call /apps for a list of available applications.', documentation: 'https://eucpilots.com/evergreen-docs/api/' }, 400)
+    return jsonResponse({
+      message: 'Invalid application name. Call /apps for a list of available applications.',
+      documentation: 'https://eucpilots.com/evergreen-docs/api/'
+    }, 400)
   }
 
   // Convert to lowercase for consistent key lookup
@@ -189,7 +192,7 @@ app.get('/', async (req, res) => {
   return jsonResponse({
     message: 'Method not found.',
     documentation: 'https://eucpilots.com/evergreen-docs/api/'
-  }, 404);
+  }, 404)
 });
 
 // Responder
