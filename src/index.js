@@ -33,6 +33,13 @@ function ensureEvergreenBinding() {
   return true
 }
 
+// Handle /app endpoint without application name
+app.get("/app", async (req, res) => {
+  return jsonResponse({ 
+    message: 'Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications.' 
+  }, 400)
+})
+
 // Returns data for a specific app
 app.get("/app/:appId", async (req, res) => {
   if (!ensureEvergreenBinding()) {
@@ -41,7 +48,7 @@ app.get("/app/:appId", async (req, res) => {
 
   const rawAppId = req.params?.appId
   if (!validateAppId(rawAppId)) {
-    return jsonResponse({ message: 'Invalid application name. Call /apps for available application names.' }, 400)
+    return jsonResponse({ message: 'Invalid application name. Call /apps for a list of available applications.' }, 400)
   }
 
   // Convert to lowercase for consistent key lookup
@@ -54,7 +61,7 @@ app.get("/app/:appId", async (req, res) => {
     if (data === null) {
       console.log("No data found for app:", key)
       return jsonResponse({
-        message: 'Application not found. Call /apps for available application names.'
+        message: 'Application not found. Call /apps for a list of available applications.'
       }, 404)
     }
 
@@ -177,7 +184,7 @@ app.get("/endpoints/downloads", async (req, res) => {
 app.get('/', async (req, res) => {
   console.log(req);
   return jsonResponse({
-    message: 'Method not found. Call /apps for available applications. Documentation: https://eucpilots.com/evergreen-docs/api/'
+    message: 'Method not found. Documentation: https://eucpilots.com/evergreen-docs/api/'
   }, 404);
 });
 
