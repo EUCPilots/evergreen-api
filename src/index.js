@@ -35,8 +35,9 @@ function ensureEvergreenBinding() {
 
 // Handle /app endpoint without application name
 app.get("/app", async (req, res) => {
-  return jsonResponse({ 
-    message: 'Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications.' 
+  return jsonResponse({
+    message: 'Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications.',
+    documentation: 'https://eucpilots.com/evergreen-docs/api/'
   }, 400)
 })
 
@@ -48,7 +49,7 @@ app.get("/app/:appId", async (req, res) => {
 
   const rawAppId = req.params?.appId
   if (!validateAppId(rawAppId)) {
-    return jsonResponse({ message: 'Invalid application name. Call /apps for a list of available applications.' }, 400)
+    return jsonResponse({ message: 'Invalid application name. Call /apps for a list of available applications.', documentation: 'https://eucpilots.com/evergreen-docs/api/' }, 400)
   }
 
   // Convert to lowercase for consistent key lookup
@@ -61,7 +62,8 @@ app.get("/app/:appId", async (req, res) => {
     if (data === null) {
       console.log("No data found for app:", key)
       return jsonResponse({
-        message: 'Application not found. Call /apps for a list of available applications.'
+        message: 'Application not found. Call /apps for a list of available applications.',
+        documentation: 'https://eucpilots.com/evergreen-docs/api/'
       }, 404)
     }
 
@@ -114,7 +116,8 @@ app.get("/apps", async (req, res) => {
 app.get('/endpoints', async (req, res) => {
   console.log(req);
   return jsonResponse({
-    message: 'Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.'
+    message: 'Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.',
+    documentation: 'https://eucpilots.com/evergreen-docs/api/'
   }, 404);
 });
 
@@ -184,7 +187,8 @@ app.get("/endpoints/downloads", async (req, res) => {
 app.get('/', async (req, res) => {
   console.log(req);
   return jsonResponse({
-    message: 'Method not found. Documentation: https://eucpilots.com/evergreen-docs/api/'
+    message: 'Method not found.',
+    documentation: 'https://eucpilots.com/evergreen-docs/api/'
   }, 404);
 });
 
