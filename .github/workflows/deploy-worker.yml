@@ -29,9 +29,9 @@ jobs:
           cd "${{ github.workspace }}"
           npm install
 
-      - name: wrangler publish production
+      - name: wrangler deploy production
         uses: cloudflare/wrangler-action@v3.14.1
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          #command: publish  --env production
+          command: deploy --env production
