@@ -41,7 +41,7 @@ app.get("/app/:appId", async (req, res) => {
 
   const rawAppId = req.params?.appId
   if (!validateAppId(rawAppId)) {
-    return jsonResponse({ message: 'Invalid application name' }, 400)
+    return jsonResponse({ message: 'Invalid application name. Call /apps for available application names.' }, 400)
   }
 
   // Convert to lowercase for consistent key lookup
@@ -177,7 +177,7 @@ app.get("/endpoints/downloads", async (req, res) => {
 app.get('/', async (req, res) => {
   console.log(req);
   return jsonResponse({
-    message: 'Method not found. Call /apps for available applications.'
+    message: 'Method not found. Call /apps for available applications. Documentation: https://eucpilots.com/evergreen-docs/api/'
   }, 404);
 });
 
