@@ -117,7 +117,7 @@ app.get("/apps", async (req, res) => {
 
 // Return a message if someone calls /endpoints
 app.get('/endpoints', async (req, res) => {
-  console.log(req);
+  console.log("GET /endpoints called");
   return jsonResponse({
     message: 'Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.',
     documentation: 'https://eucpilots.com/evergreen-docs/api/'
@@ -188,7 +188,7 @@ app.get("/endpoints/downloads", async (req, res) => {
 
 // Return data for /*
 app.get('/', async (req, res) => {
-  console.log(req);
+  console.log(`Received request: ${req.method} ${req.url}`);
   return jsonResponse({
     message: 'Method not found.',
     documentation: 'https://eucpilots.com/evergreen-docs/api/'
