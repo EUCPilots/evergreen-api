@@ -110,3 +110,6 @@ dist
 # Logs for testing
 logs.json
 logs.csv
+
+# Auth files
+auth.json
