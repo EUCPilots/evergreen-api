@@ -22,7 +22,7 @@ routes = [
 name = "evergreen-api"
 vars = { ENVIRONMENT = "production" }
 routes = [
-    "evergreen-api-staging.stealthpuppy.workers.dev/*"
+    "evergreen-api.stealthpuppy.workers.dev/*"
 ]
 kv_namespaces = [
     { binding = "EVERGREEN", id = "037069e7da3e4944be2cbc97c92409a5", preview_id = "037069e7da3e4944be2cbc97c92409a5" }
