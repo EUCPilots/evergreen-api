@@ -1,6 +1,6 @@
 {
   "name": "evergreen",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Evergreen API running on Cloudflare Workers.",
   "main": "src/index.js",
   "scripts": {
@@ -9,21 +9,22 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aaronparker/workers.git"
+    "url": "git+https://github.com/EUCPilots/evergreen-api.git"
   },
   "author": "Aaron Parker",
   "license": "",
   "bugs": {
-    "url": "https://github.com/aaronparker/workers/issues"
+    "url": "https://github.com/EUCPilots/evergreen-api/issues"
   },
-  "homepage": "https://github.com/aaronparker/workers#readme",
+  "homepage": "https://github.com/EUCPilots/evergreen-api#readme",
   "keywords": [
     "express",
     "expressjs",
     "cloudflare",
     "worker",
     "rest",
-    "api"
+    "api",
+    "evergreen"
   ],
   "dependencies": {
     "cloudflare-worker-rest-api": "^1.0.0",
