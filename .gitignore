@@ -111,5 +111,6 @@ dist
 logs.json
 logs.csv
 
-# Auth files
+# Other files
 auth.json
+.wrangler
