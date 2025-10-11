@@ -7,7 +7,7 @@ servers:
     url: https://virtserver.swaggerhub.com/stealthpuppy/evergreen-api/1.0.0
 info:
   description: Evergreen API
-  version: 1.0.0
+  version: 1.5.1
   title: An API that provides evergreen application versions and URLs
   license:
     name: Apache 2.0
@@ -56,12 +56,12 @@ paths:
               schema:
                 type: array
                 items: {"$ref":"#/components/schemas/app"}
-  '/endpoints/updates':
+  '/endpoints/versions':
     get:
       tags:
         - endpoints
       summary: Returns the list of endpoints (hostnames) used by Evergreen when returning version numbers and downloads.
-      operationId: endpoints-updates
+      operationId: endpoints-versions
       description: |
         Returns the list of endpoints (hostnames) used by Evergreen when returning version numbers and downloads.
       responses:
@@ -71,7 +71,7 @@ paths:
             application/json:
               schema:
                 type: array
-                items: {"$ref":"#/components/schemas/endpoints-updates"}
+                items: {"$ref":"#/components/schemas/endpoints-versions"}
   '/endpoints/downloads':
     get:
       tags:
@@ -118,7 +118,7 @@ components:
         URI:
           type: string
           example: 'https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/df5f91af-5996-41be-b122-e2c697f911fe/MicrosoftEdgeBetaEnterpriseX64.msi'
-    endpoints-updates:
+    endpoints-versions:
       type: object
       required:
         - Application

@@ -1,0 +1,402 @@
+openapi: 3.0.0
+info:
+  title: Evergreen API
+  description: |
+    An API that provides evergreen application versions and URLs for the latest releases of popular software applications.
+    
+    The Evergreen API helps system administrators and IT professionals stay up-to-date with the latest software versions by providing programmatic access to version information and download URLs.
+  version: "1.5.1"
+  contact:
+    name: EUC Pilots
+    url: https://eucpilots.com/evergreen-docs/api/
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+
+servers:
+  - url: https://evergreen-api.stealthpuppy.com
+    description: Production server
+
+tags:
+  - name: Applications
+    description: Operations related to application version information
+  - name: Endpoints
+    description: Operations related to data source endpoints used by Evergreen
+
+paths:
+  /:
+    get:
+      tags:
+        - Applications
+      summary: API root endpoint
+      description: Returns information about the API when accessed at the root path
+      responses:
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /app:
+    get:
+      tags:
+        - Applications
+      summary: Get application endpoint without name
+      description: Returns an error message indicating that an application name is required
+      responses:
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /app/{appId}:
+    get:
+      tags:
+        - Applications
+      summary: Get application details
+      description: |
+        Returns version information and download URLs for a specific application.
+        Application IDs are case-insensitive and should match the names returned by the `/apps` endpoint.
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          description: |
+            The application identifier (case-insensitive). 
+            Examples: MicrosoftEdge, MozillaFirefox, GoogleChrome, etc.
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9-_]{1,64}$'
+            example: MicrosoftEdge
+      responses:
+        '200':
+          description: Application details retrieved successfully
+          headers:
+            Cache-Control:
+              description: Caching policy for the response
+              schema:
+                type: string
+                example: "public, max-age=300"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationDetails'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/ApplicationNotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /apps:
+    get:
+      tags:
+        - Applications
+      summary: List all supported applications
+      description: |
+        Returns a list of all supported applications with their names, display names, and vendor URLs.
+        This endpoint is useful for discovering available applications before querying specific application details.
+      responses:
+        '200':
+          description: List of supported applications
+          headers:
+            Cache-Control:
+              description: Caching policy for the response
+              schema:
+                type: string
+                example: "public, max-age=300"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationSummary'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /endpoints:
+    get:
+      tags:
+        - Endpoints
+      summary: Get endpoints information
+      description: Returns information about available endpoint sub-paths
+      responses:
+        '404':
+          description: Method not found with endpoint suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointsInfo'
+
+  /endpoints/versions:
+    get:
+      tags:
+        - Endpoints
+      summary: Get version check endpoints
+      description: |
+        Returns the list of endpoints (hostnames) used by Evergreen when checking for application versions.
+        These are the external services that Evergreen queries to determine the latest version information.
+      responses:
+        '200':
+          description: List of version check endpoints
+          headers:
+            Cache-Control:
+              description: Caching policy for the response
+              schema:
+                type: string
+                example: "public, max-age=300"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VersionEndpoint'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /endpoints/downloads:
+    get:
+      tags:
+        - Endpoints
+      summary: Get download endpoints
+      description: |
+        Returns the list of endpoints (hostnames) used by Evergreen when downloading application installers.
+        These are the external services that host the actual application download files.
+      responses:
+        '200':
+          description: List of download endpoints
+          headers:
+            Cache-Control:
+              description: Caching policy for the response
+              schema:
+                type: string
+                example: "public, max-age=300"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DownloadEndpoint'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    ApplicationSummary:
+      type: object
+      description: Summary information about a supported application
+      required:
+        - Name
+        - Application
+        - Link
+      properties:
+        Name:
+          type: string
+          description: The application identifier used in API calls
+          example: "MicrosoftEdge"
+        Application:
+          type: string
+          description: The human-readable application name
+          example: "Microsoft Edge"
+        Link:
+          type: string
+          format: uri
+          description: URL to the vendor's website for this application
+          example: "https://www.microsoft.com/edge"
+
+    ApplicationDetails:
+      type: object
+      description: Detailed version and download information for an application
+      required:
+        - Version
+        - URI
+      properties:
+        Version:
+          type: string
+          description: The latest version number of the application
+          example: "119.0.2151.44"
+        URI:
+          type: string
+          format: uri
+          description: Direct download URL for the latest version
+          example: "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/df5f91af-5996-41be-b122-e2c697f911fe/MicrosoftEdgeEnterpriseX64.msi"
+        Size:
+          type: integer
+          description: File size in bytes (if available)
+          example: 157286400
+        Architecture:
+          type: string
+          description: Target architecture (if specified)
+          example: "x64"
+        Type:
+          type: string
+          description: Installer type (if specified)
+          example: "msi"
+        Language:
+          type: string
+          description: Language code (if specified)
+          example: "en-US"
+
+    VersionEndpoint:
+      type: object
+      description: External endpoint used for version checking
+      required:
+        - Application
+        - Endpoints
+      properties:
+        Application:
+          type: string
+          description: The application name
+          example: "Microsoft Edge"
+        Endpoints:
+          type: array
+          description: List of hostnames used for version checking
+          items:
+            type: string
+            format: hostname
+          example: ["edgeupdates.microsoft.com", "www.microsoft.com"]
+
+    DownloadEndpoint:
+      type: object
+      description: External endpoint used for downloading applications
+      required:
+        - Application
+        - Endpoints
+      properties:
+        Application:
+          type: string
+          description: The application name
+          example: "Microsoft Edge"
+        Endpoints:
+          type: array
+          description: List of hostnames used for downloading
+          items:
+            type: string
+            format: hostname
+          example: ["msedge.sf.dl.delivery.mp.microsoft.com"]
+
+    EndpointsInfo:
+      type: object
+      description: Information about available endpoint paths
+      required:
+        - message
+        - documentation
+      properties:
+        message:
+          type: string
+          description: Error message with supported endpoint information
+          example: "Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads."
+        documentation:
+          type: string
+          format: uri
+          description: Link to API documentation
+          example: "https://eucpilots.com/evergreen-docs/api/"
+
+    ErrorResponse:
+      type: object
+      description: Standard error response format
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Human-readable error message
+        documentation:
+          type: string
+          format: uri
+          description: Link to API documentation
+          example: "https://eucpilots.com/evergreen-docs/api/"
+
+  responses:
+    BadRequestError:
+      description: Bad request - invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidAppName:
+              summary: Invalid application name
+              value:
+                message: "Invalid application name. Call /apps for a list of available applications."
+                documentation: "https://eucpilots.com/evergreen-docs/api/"
+            missingAppName:
+              summary: Missing application name
+              value:
+                message: "Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications."
+                documentation: "https://eucpilots.com/evergreen-docs/api/"
+
+    ApplicationNotFoundError:
+      description: Application not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: "Application not found. Call /apps for a list of available applications."
+            documentation: "https://eucpilots.com/evergreen-docs/api/"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            methodNotFound:
+              summary: Method not found
+              value:
+                message: "Method not found."
+                documentation: "https://eucpilots.com/evergreen-docs/api/"
+            noDataAvailable:
+              summary: No data available
+              value:
+                message: "No apps available"
+            noEndpointsData:
+              summary: No endpoints data
+              value:
+                message: "No endpoints data available"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            serverConfigError:
+              summary: Server configuration error
+              value:
+                message: "Server configuration error"
+            dataCorrupted:
+              summary: Data corruption error
+              value:
+                message: "Stored data is corrupted"
+            internalError:
+              summary: General internal error
+              value:
+                message: "Internal server error"
+
+  examples:
+    MicrosoftEdgeResponse:
+      summary: Microsoft Edge application details
+      value:
+        Version: "119.0.2151.44"
+        URI: "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/df5f91af-5996-41be-b122-e2c697f911fe/MicrosoftEdgeEnterpriseX64.msi"
+        Size: 157286400
+        Architecture: "x64"
+        Type: "msi"
+
+    ApplicationsList:
+      summary: List of supported applications
+      value:
+        - Name: "MicrosoftEdge"
+          Application: "Microsoft Edge"
+          Link: "https://www.microsoft.com/edge"
+        - Name: "MozillaFirefox"
+          Application: "Mozilla Firefox"
+          Link: "https://www.mozilla.org/firefox/"
+        - Name: "GoogleChrome"
+          Application: "Google Chrome"
+          Link: "https://www.google.com/chrome/"
