@@ -22,3 +22,8 @@ vars = { ENVIRONMENT = "production" }
 kv_namespaces = [
     { binding = "EVERGREEN", id = "037069e7da3e4944be2cbc97c92409a5" }
 ]
+
+[[r2_buckets]]
+binding = "LOGS_BUCKET"
+bucket_name = "evergreen-api"
+preview_bucket_name = "evergreen-api-test"

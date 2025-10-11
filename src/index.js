@@ -33,6 +33,52 @@ function ensureEvergreenBinding() {
   return true
 }
 
+function ensureLogsBucketBinding() {
+  if (typeof LOGS_BUCKET === 'undefined') {
+    console.error('LOGS_BUCKET R2 binding is not available')
+    return false
+  }
+  return true
+}
+
+async function storeLogToR2(request, startTime) {
+  if (!ensureLogsBucketBinding()) {
+    return
+  }
+
+  try {
+    const endTime = Date.now()
+    const timestamp = new Date().toISOString()
+    
+    // Extract only the fields we want to store
+    const logData = {
+      timestamp: timestamp,
+      url: request.url,
+      path: new URL(request.url).pathname,
+      connectingIp: request.headers.get('cf-connecting-ip'),
+      country: request.headers.get('cf-ipcountry'),
+      region: request.cf?.region || null,
+      asOrganization: request.cf?.asOrganization || null,
+      userAgent: request.headers.get('user-agent'),
+      processingTimeMs: endTime - startTime
+    }
+
+    // Generate a unique key for the log entry
+    const logKey = `logs/${timestamp.slice(0, 10)}/${timestamp}_${Math.random().toString(36).substr(2, 9)}.json`
+    
+    // Store the log data in R2
+    await LOGS_BUCKET.put(logKey, JSON.stringify(logData, null, 2), {
+      httpMetadata: {
+        contentType: 'application/json'
+      }
+    })
+    
+    console.log(`Log stored to R2: ${logKey}`)
+  } catch (error) {
+    console.error('Failed to store log to R2:', error)
+  }
+}
+
 // Handle /app endpoint without application name
 app.get("/app", async (req, res) => {
   return jsonResponse({
@@ -197,5 +243,13 @@ app.get('/', async (req, res) => {
 
 // Responder
 addEventListener('fetch', event => {
-  event.respondWith(app.handleRequest(event.request))
+  const startTime = Date.now()
+  
+  event.respondWith(
+    app.handleRequest(event.request).then(response => {
+      // Store log to R2 asynchronously (don't await to avoid delaying response)
+      event.waitUntil(storeLogToR2(event.request, startTime))
+      return response
+    })
+  )
 })
