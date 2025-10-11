@@ -26,10 +26,12 @@ function validateAppId(appId) {
 }
 
 function ensureEvergreenBinding() {
+  console.log('Checking EVERGREEN binding...', typeof EVERGREEN)
   if (typeof EVERGREEN === 'undefined') {
     console.error('EVERGREEN KV binding is not available')
     return false
   }
+  console.log('EVERGREEN binding is available')
   return true
 }
 
@@ -231,6 +233,40 @@ app.get("/endpoints/downloads", async (req, res) => {
     return jsonResponse({ message: 'Internal server error' }, 500)
   }
 });
+
+// Health check endpoint for debugging
+app.get("/health", async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    bindings: {
+      evergreen: typeof EVERGREEN !== 'undefined',
+      logsBucket: typeof LOGS_BUCKET !== 'undefined'
+    },
+    environment: typeof ENVIRONMENT !== 'undefined' ? ENVIRONMENT : 'unknown'
+  }
+
+  // Try to test KV access if available
+  if (typeof EVERGREEN !== 'undefined') {
+    try {
+      // Test if we can list keys (this will help identify if it's a permissions issue)
+      const testResult = await EVERGREEN.get('_allapps', { type: 'json' })
+      health.kvTest = {
+        accessible: true,
+        hasAllapps: testResult !== null,
+        allappsType: typeof testResult
+      }
+    } catch (error) {
+      health.kvTest = {
+        accessible: false,
+        error: error.message
+      }
+    }
+  }
+
+  console.log('Health check:', JSON.stringify(health, null, 2))
+  return jsonResponse(health, 200)
+})
 
 // Return data for /*
 app.get('/', async (req, res) => {

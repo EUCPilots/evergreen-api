@@ -5,7 +5,7 @@ info:
     An API that provides evergreen application versions and URLs for the latest releases of popular software applications.
     
     The Evergreen API helps system administrators and IT professionals stay up-to-date with the latest software versions by providing programmatic access to version information and download URLs.
-  version: "1.5.1"
+  version: "1.5.2"
   contact:
     name: EUC Pilots
     url: https://eucpilots.com/evergreen-docs/api/
@@ -22,6 +22,8 @@ tags:
     description: Operations related to application version information
   - name: Endpoints
     description: Operations related to data source endpoints used by Evergreen
+  - name: System
+    description: System health and diagnostic operations
 
 paths:
   /:
@@ -110,6 +112,27 @@ paths:
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/InternalServerError'
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check and diagnostic endpoint
+      description: |
+        Returns the health status of the API and detailed information about system bindings and configuration.
+        This endpoint is useful for debugging configuration issues and monitoring system status.
+      responses:
+        '200':
+          description: System health information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                healthy:
+                  $ref: '#/components/examples/HealthCheckResponse'
+                withIssues:
+                  $ref: '#/components/examples/HealthCheckWithIssues'
 
   /endpoints:
     get:
@@ -308,6 +331,64 @@ components:
           description: Link to API documentation
           example: "https://eucpilots.com/evergreen-docs/api/"
 
+    HealthStatus:
+      type: object
+      description: System health and diagnostic information
+      required:
+        - status
+        - timestamp
+        - bindings
+      properties:
+        status:
+          type: string
+          description: Overall system status
+          example: "ok"
+          enum: ["ok", "warning", "error"]
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the health check
+          example: "2025-10-12T10:30:00.000Z"
+        bindings:
+          type: object
+          description: Status of system bindings
+          required:
+            - evergreen
+            - logsBucket
+          properties:
+            evergreen:
+              type: boolean
+              description: Whether the EVERGREEN KV binding is available
+              example: true
+            logsBucket:
+              type: boolean
+              description: Whether the LOGS_BUCKET R2 binding is available
+              example: true
+        environment:
+          type: string
+          description: Current environment setting
+          example: "production"
+        kvTest:
+          type: object
+          description: Results of KV namespace accessibility tests
+          properties:
+            accessible:
+              type: boolean
+              description: Whether the KV namespace is accessible
+              example: true
+            hasAllapps:
+              type: boolean
+              description: Whether the _allapps key exists in KV
+              example: true
+            allappsType:
+              type: string
+              description: Type of data in _allapps key
+              example: "object"
+            error:
+              type: string
+              description: Error message if KV test failed
+              example: "Permission denied"
+
   responses:
     BadRequestError:
       description: Bad request - invalid input parameters
@@ -400,3 +481,30 @@ components:
         - Name: "GoogleChrome"
           Application: "Google Chrome"
           Link: "https://www.google.com/chrome/"
+
+    HealthCheckResponse:
+      summary: Healthy system with all bindings available
+      value:
+        status: "ok"
+        timestamp: "2025-10-12T10:30:00.000Z"
+        bindings:
+          evergreen: true
+          logsBucket: true
+        environment: "production"
+        kvTest:
+          accessible: true
+          hasAllapps: true
+          allappsType: "object"
+
+    HealthCheckWithIssues:
+      summary: System with KV binding issues
+      value:
+        status: "error"
+        timestamp: "2025-10-12T10:30:00.000Z"
+        bindings:
+          evergreen: false
+          logsBucket: true
+        environment: "dev"
+        kvTest:
+          accessible: false
+          error: "EVERGREEN KV binding is not available"
