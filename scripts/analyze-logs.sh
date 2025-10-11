@@ -15,6 +15,8 @@ function show_help() {
     echo "  count [date]            Count logs for a specific date"
     echo "  summary [date]          Show traffic summary for a date"
     echo "  countries [date]        Show requests by country"
+    echo "  regions [date]          Show requests by region/state"
+    echo "  organizations [date]    Show requests by ISP/organization"
     echo "  endpoints [date]        Show most requested endpoints"
     echo "  ips [date]              Show top IP addresses"
     echo "  errors [date]           Show error analysis (if available)"
@@ -28,6 +30,8 @@ function show_help() {
     echo "  $0 dates"
     echo "  $0 summary 2025-10-10"
     echo "  $0 countries 2025-10-10"
+    echo "  $0 regions 2025-10-10"
+    echo "  $0 organizations 2025-10-10"
     echo "  $0 endpoints $(date +%Y-%m-%d)"
 }
 
@@ -109,11 +113,15 @@ function traffic_summary() {
     total_requests=$(cat "$temp_file" | jq -s length)
     unique_ips=$(cat "$temp_file" | jq -r '.connectingIp' | sort -u | wc -l)
     countries=$(cat "$temp_file" | jq -r '.country' | sort -u | wc -l)
+    regions=$(cat "$temp_file" | jq -r '.region // "null"' | sort -u | wc -l)
+    organizations=$(cat "$temp_file" | jq -r '.asOrganization // "null"' | sort -u | wc -l)
     avg_processing_time=$(cat "$temp_file" | jq '.processingTimeMs' | awk '{sum+=$1; count++} END {if(count>0) print sum/count; else print 0}')
     
     echo "📈 Total requests: $total_requests"
     echo "🌐 Unique IPs: $unique_ips"
     echo "🗺️  Countries: $countries"
+    echo "📍 Regions: $regions"
+    echo "🏢 Organizations: $organizations"
     echo "⏱️  Average processing time: ${avg_processing_time}ms"
     
     rm "$temp_file"
@@ -136,6 +144,50 @@ function analyze_countries() {
     cat "$temp_file" | jq -r '.country' | sort | uniq -c | sort -nr | head -10 | \
     while read -r count country; do
         echo "  🌍 $country: $count requests"
+    done
+    
+    rm "$temp_file"
+}
+
+function analyze_regions() {
+    local date="${1:-$(date +%Y-%m-%d)}"
+    echo "📍 Requests by region/state for $date..."
+    
+    temp_file=$(mktemp)
+    get_logs_for_date "$date" 1000 > "$temp_file"
+    
+    if [ ! -s "$temp_file" ]; then
+        echo "📭 No logs found for $date"
+        rm "$temp_file"
+        return
+    fi
+    
+    echo "Top regions:"
+    cat "$temp_file" | jq -r '.region // "Unknown"' | sort | uniq -c | sort -nr | head -10 | \
+    while read -r count region; do
+        echo "  📍 $region: $count requests"
+    done
+    
+    rm "$temp_file"
+}
+
+function analyze_organizations() {
+    local date="${1:-$(date +%Y-%m-%d)}"
+    echo "🏢 Requests by ISP/organization for $date..."
+    
+    temp_file=$(mktemp)
+    get_logs_for_date "$date" 1000 > "$temp_file"
+    
+    if [ ! -s "$temp_file" ]; then
+        echo "📭 No logs found for $date"
+        rm "$temp_file"
+        return
+    fi
+    
+    echo "Top organizations:"
+    cat "$temp_file" | jq -r '.asOrganization // "Unknown"' | sort | uniq -c | sort -nr | head -10 | \
+    while read -r count org; do
+        echo "  🏢 $org: $count requests"
     done
     
     rm "$temp_file"
@@ -221,6 +273,12 @@ case "$1" in
         ;;
     "countries")
         analyze_countries "$2"
+        ;;
+    "regions")
+        analyze_regions "$2"
+        ;;
+    "organizations")
+        analyze_organizations "$2"
         ;;
     "endpoints")
         analyze_endpoints "$2"
