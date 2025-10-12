@@ -15,7 +15,7 @@ Write-Information -MessageData "$($PSStyle.Foreground.Cyan)Read auth file: auth.
 $Auth = Get-Content -Raw -Path "./auth.json" | ConvertFrom-Json
 
 Write-Information -MessageData "$($PSStyle.Foreground.Cyan)Import AWSPowerShell.NetCore module"
-Import-Module AWSPowerShell.NetCore
+Import-Module -Name "AWSPowerShell.NetCore"
 
 Write-Information -MessageData "$($PSStyle.Foreground.Cyan)Authenticate to Cloudflare R2 bucket"
 $Credentials = New-Object -TypeName "Amazon.Runtime.BasicAWSCredentials"($Auth.AccessKey, $Auth.SecretKey)
