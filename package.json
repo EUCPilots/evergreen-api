@@ -1,6 +1,6 @@
 {
   "name": "evergreen",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Evergreen API running on Cloudflare Workers.",
   "main": "src/index.js",
   "scripts": {

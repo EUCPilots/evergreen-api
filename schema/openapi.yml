@@ -12,7 +12,7 @@ info:
     ## User-Agent Requirement
     All API requests must include a custom User-Agent header following the format "company/location" or similar descriptive pattern.
     Examples: "ACME-Corp/NewYork", "TechServices/CloudOps", "PersonalProject/HomeOffice"
-  version: "1.5.2"
+  version: "1.5.3"
   contact:
     name: EUC Pilots
     url: https://eucpilots.com/evergreen-docs/api/
