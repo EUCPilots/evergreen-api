@@ -1,6 +1,29 @@
 {
     "cSpell.words": [
         "allapps",
-        "expressjs"
-    ]
+        "expressjs",
+        "wrangler",
+        "cloudflare",
+        "evergreen"
+    ],
+    "files.associations": {
+        "wrangler.toml": "toml",
+        "*.wrangler.toml": "toml"
+    },
+    "files.exclude": {
+        "**/node_modules": true,
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/dist": true,
+        "**/.wrangler": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/.wrangler": true
+    },
+    "typescript.preferences.includePackageJsonAutoImports": "auto",
+    "javascript.preferences.includePackageJsonAutoImports": "auto",
+    "wrangler.autoDetectProject": true,
+    "wrangler.enablePreview": true
 }
