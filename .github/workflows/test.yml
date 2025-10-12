@@ -9,7 +9,6 @@ on:
       - 'tests/**'
       - 'package.json'
       - 'wrangler.toml'
-      - '.github/workflows/**'
 
   # Run tests on pushes to main and development branches
   push:
@@ -19,14 +18,9 @@ on:
       - 'tests/**'
       - 'package.json'
       - 'wrangler.toml'
-      - '.github/workflows/**'
 
   # Allow manual workflow runs
   workflow_dispatch:
-
-  # Run tests nightly to catch production API changes
-  schedule:
-    - cron: '0 6 * * *'  # 6 AM UTC daily
 
 jobs:
   test:
