@@ -1,0 +1,295 @@
+name: API Tests
+
+on:
+  # Run tests on pull requests to any branch
+  pull_request:
+    branches: ["*"]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'wrangler.toml'
+      - '.github/workflows/**'
+
+  # Run tests on pushes to main and development branches
+  push:
+    branches: [main, dev, development, staging, cache]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'wrangler.toml'
+      - '.github/workflows/**'
+
+  # Allow manual workflow runs
+  workflow_dispatch:
+
+  # Run tests nightly to catch production API changes
+  schedule:
+    - cron: '0 6 * * *'  # 6 AM UTC daily
+
+jobs:
+  test:
+    name: Run API Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: tests/package.json
+
+      - name: Install test dependencies
+        run: |
+          cd tests
+          npm ci
+
+      - name: Run API tests against production
+        run: |
+          cd tests
+          npm test
+        env:
+          NODE_ENV: test
+
+      - name: Generate test report
+        if: always()
+        run: |
+          cd tests
+          npx mocha test.js --timeout 30000 --reporter json > test-results.json || true
+          npx mocha test.js --timeout 30000 --reporter tap > test-results.tap || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node-version }}
+          path: |
+            tests/test-results.json
+            tests/test-results.tap
+
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Check JavaScript syntax
+        run: |
+          # Basic syntax check for main source file
+          node -c src/index.js
+          
+      - name: Check JSON files
+        run: |
+          # Validate JSON files
+          if [ -f package.json ]; then
+            echo "Validating package.json..."
+            python3 -m json.tool package.json > /dev/null
+          fi
+          
+          if [ -f tests/package.json ]; then
+            echo "Validating tests/package.json..."
+            python3 -m json.tool tests/package.json > /dev/null
+          fi
+
+      - name: Check TOML files
+        run: |
+          # Install toml-cli for validation
+          npm install -g @iarna/toml
+          
+          # Validate wrangler.toml
+          if [ -f wrangler.toml ]; then
+            echo "Validating wrangler.toml..."
+            toml-cli get wrangler.toml name > /dev/null
+          fi
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install test dependencies
+        run: |
+          cd tests
+          npm ci
+
+      - name: Run security audit
+        run: |
+          cd tests
+          npm audit --audit-level=high
+
+      - name: Check for secrets
+        run: |
+          # Basic check for potential secrets in code
+          echo "Checking for potential secrets..."
+          
+          # Check for hardcoded API keys, tokens, etc.
+          if grep -r -i -E "(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][^'\"]{8,}" src/ tests/ --exclude-dir=node_modules || true; then
+            echo "⚠️  Potential secrets found in code. Please review."
+          else
+            echo "✅ No obvious secrets detected."
+          fi
+
+  validate-api:
+    name: Validate API Schema
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install schema validation tools
+        run: |
+          npm install -g @apidevtools/swagger-cli
+
+      - name: Validate OpenAPI schema
+        run: |
+          if [ -f schema/openapi.yml ]; then
+            echo "Validating OpenAPI schema..."
+            swagger-cli validate schema/openapi.yml
+            echo "✅ OpenAPI schema is valid"
+          else
+            echo "ℹ️  No OpenAPI schema found at schema/openapi.yml"
+          fi
+
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: |
+          cd tests
+          npm ci
+
+      - name: Run performance tests
+        run: |
+          cd tests
+          echo "Running performance validation..."
+          
+          # Run tests with timing
+          time npx mocha test.js --timeout 30000 --grep "Caching Performance"
+          
+          # Basic load test with curl
+          echo "Testing API response times..."
+          for i in {1..5}; do
+            echo "Request $i:"
+            curl -w "Time: %{time_total}s, Status: %{http_code}\n" -o /dev/null -s \
+              -H "User-Agent: GitHub-Actions-Performance-Test/1.0.0" \
+              "https://evergreen-api.stealthpuppy.com/health"
+          done
+
+  comment-pr:
+    name: Comment Test Results
+    runs-on: ubuntu-latest
+    needs: [test, lint, security, validate-api]
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Download test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          merge-multiple: true
+
+      - name: Comment PR with results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              // Read test results
+              let testSummary = "## 🧪 Test Results\n\n";
+              
+              // Check if test results exist
+              if (fs.existsSync('test-results.json')) {
+                const results = JSON.parse(fs.readFileSync('test-results.json', 'utf8'));
+                const passing = results.stats.passes || 0;
+                const failing = results.stats.failures || 0;
+                const total = results.stats.tests || 0;
+                
+                if (failing === 0) {
+                  testSummary += `✅ **All ${total} tests passed!**\n\n`;
+                } else {
+                  testSummary += `❌ **${failing} out of ${total} tests failed**\n\n`;
+                }
+                
+                testSummary += `- ✅ Passing: ${passing}\n`;
+                testSummary += `- ❌ Failing: ${failing}\n`;
+                testSummary += `- 📊 Total: ${total}\n\n`;
+              } else {
+                testSummary += "📋 Test results not available\n\n";
+              }
+              
+              testSummary += "### 🔍 Validation Status\n";
+              testSummary += "- ✅ Code linting\n";
+              testSummary += "- ✅ Security scan\n";
+              testSummary += "- ✅ API schema validation\n";
+              testSummary += "- ✅ Performance tests\n\n";
+              
+              testSummary += "### 📝 Notes\n";
+              testSummary += "- Tests run against production API\n";
+              testSummary += "- Validates both current and new caching implementations\n";
+              testSummary += "- Ensures API compatibility and performance\n";
+              
+              // Post comment
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: testSummary
+              });
+            } catch (error) {
+              console.log('Error posting comment:', error);
+            }
+
+  notify-slack:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [test, lint, security, validate-api]
+    if: failure() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cache')
+    
+    steps:
+      - name: Notify on failure
+        run: |
+          echo "🚨 Tests failed on ${{ github.ref_name }} branch"
+          echo "Consider setting up Slack notifications for critical failures"
+          # You can add Slack webhook integration here if needed

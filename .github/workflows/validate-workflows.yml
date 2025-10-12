@@ -1,0 +1,226 @@
+name: Workflow Validation
+
+on:
+  # Run when workflow files change
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+
+  # Manual trigger
+  workflow_dispatch:
+
+jobs:
+  validate-workflows:
+    name: Validate Workflow Files
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate YAML syntax
+        run: |
+          echo "🔍 Validating workflow YAML syntax..."
+          
+          # Check each workflow file
+          for file in .github/workflows/*.yml .github/workflows/*.yaml; do
+            if [ -f "$file" ]; then
+              echo "Checking $file..."
+              python3 -c "
+              import yaml
+              import sys
+              try:
+                  with open('$file', 'r') as f:
+                      yaml.safe_load(f)
+                  print('✅ $file: Valid YAML')
+              except yaml.YAMLError as e:
+                  print('❌ $file: Invalid YAML - ' + str(e))
+                  sys.exit(1)
+              except Exception as e:
+                  print('⚠️  $file: Could not validate - ' + str(e))
+              "
+            fi
+          done
+
+      - name: Check workflow best practices
+        run: |
+          echo "📋 Checking workflow best practices..."
+          
+          # Check for required elements
+          for file in .github/workflows/*.yml; do
+            if [ -f "$file" ]; then
+              echo "Analyzing $file..."
+              
+              # Check for name
+              if grep -q "^name:" "$file"; then
+                echo "  ✅ Has name"
+              else
+                echo "  ⚠️  Missing name"
+              fi
+              
+              # Check for on triggers
+              if grep -q "^on:" "$file"; then
+                echo "  ✅ Has triggers"
+              else
+                echo "  ❌ Missing triggers"
+              fi
+              
+              # Check for jobs
+              if grep -q "^jobs:" "$file"; then
+                echo "  ✅ Has jobs"
+              else
+                echo "  ❌ Missing jobs"
+              fi
+              
+              # Check for timeout settings
+              if grep -q "timeout" "$file"; then
+                echo "  ✅ Has timeouts configured"
+              else
+                echo "  ⚠️  Consider adding timeouts"
+              fi
+              
+              echo ""
+            fi
+          done
+
+      - name: Check for security best practices
+        run: |
+          echo "🔒 Checking security best practices..."
+          
+          for file in .github/workflows/*.yml; do
+            if [ -f "$file" ]; then
+              echo "Security check: $file"
+              
+              # Check for hardcoded secrets
+              if grep -i -E "(password|token|key|secret).*:" "$file" | grep -v "secrets\." | grep -v "github\.token"; then
+                echo "  ⚠️  Potential hardcoded secrets found"
+              else
+                echo "  ✅ No hardcoded secrets detected"
+              fi
+              
+              # Check for specific action versions
+              if grep -E "uses:.*@v[0-9]+" "$file" > /dev/null; then
+                echo "  ✅ Uses pinned action versions"
+              else
+                echo "  ⚠️  Consider pinning action versions"
+              fi
+              
+              echo ""
+            fi
+          done
+
+      - name: Generate workflow summary
+        run: |
+          echo "📊 Workflow Summary" > workflow-summary.md
+          echo "==================" >> workflow-summary.md
+          echo "" >> workflow-summary.md
+          
+          # Count workflows
+          workflow_count=$(find .github/workflows -name "*.yml" -o -name "*.yaml" | wc -l)
+          echo "Total workflows: $workflow_count" >> workflow-summary.md
+          echo "" >> workflow-summary.md
+          
+          echo "## Workflow Files" >> workflow-summary.md
+          for file in .github/workflows/*.yml; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              workflow_name=$(grep "^name:" "$file" | cut -d: -f2- | sed 's/^ *//' || echo "Unnamed")
+              echo "- **$filename**: $workflow_name" >> workflow-summary.md
+            fi
+          done
+          
+          echo "" >> workflow-summary.md
+          echo "## Validation Status" >> workflow-summary.md
+          echo "- ✅ YAML syntax validation" >> workflow-summary.md
+          echo "- ✅ Best practices check" >> workflow-summary.md
+          echo "- ✅ Security review" >> workflow-summary.md
+          
+          echo "Workflow summary:"
+          cat workflow-summary.md
+
+      - name: Upload validation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-validation
+          path: workflow-summary.md
+
+  test-workflow-triggers:
+    name: Test Workflow Triggers
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Analyze trigger patterns
+        run: |
+          echo "🎯 Analyzing workflow triggers..."
+          
+          echo "Workflow trigger summary:"
+          echo "========================"
+          
+          for file in .github/workflows/*.yml; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              echo ""
+              echo "📁 $filename:"
+              
+              # Extract triggers
+              if grep -A 10 "^on:" "$file" | grep -E "(pull_request|push|schedule|workflow_dispatch)" > /dev/null; then
+                grep -A 10 "^on:" "$file" | grep -E "(pull_request|push|schedule|workflow_dispatch)" | sed 's/^/  /'
+              else
+                echo "  No standard triggers found"
+              fi
+            fi
+          done
+
+      - name: Check for duplicate triggers
+        run: |
+          echo ""
+          echo "🔍 Checking for potential trigger conflicts..."
+          
+          # This is a basic check - in practice, multiple workflows can have same triggers
+          echo "Multiple workflows may trigger on the same events - this is usually fine."
+          echo "Consider workflow dependencies and resource usage."
+
+  documentation-check:
+    name: Check Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check workflow documentation
+        run: |
+          echo "📚 Checking workflow documentation..."
+          
+          if [ -f .github/workflows/README.md ]; then
+            echo "✅ Workflow documentation exists"
+            
+            # Check if all workflows are documented
+            echo ""
+            echo "Documented workflows:"
+            grep -E "^### [0-9]+\." .github/workflows/README.md | sed 's/### [0-9]*\. /  - /'
+            
+          else
+            echo "⚠️  Consider adding workflow documentation"
+          fi
+
+      - name: Suggest improvements
+        run: |
+          echo ""
+          echo "💡 Workflow Improvement Suggestions:"
+          echo "===================================="
+          echo ""
+          echo "1. 📊 Monitoring: Consider adding workflow status badges to README"
+          echo "2. 🔔 Notifications: Add Slack/Teams integration for critical failures"
+          echo "3. 📈 Metrics: Track workflow performance and success rates"
+          echo "4. 🔄 Caching: Use action caching for dependencies to speed up runs"
+          echo "5. 🎯 Targeting: Fine-tune path filters to reduce unnecessary runs"
+          echo "6. 🚀 Environments: Consider using GitHub Environments for staged deployments"
