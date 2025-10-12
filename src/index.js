@@ -2,6 +2,11 @@
 import restCfWorker from 'cloudflare-worker-rest-api'
 const app = new restCfWorker()
 
+// === CACHING INFRASTRUCTURE ===
+// In-memory cache for fastest access (survives during worker execution)
+const memoryCache = new Map()
+const CACHE_TTL = 12 * 60 * 60 * 1000 // 12 hours in milliseconds
+
 // Helper functions for consistent responses and error handling
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
@@ -43,6 +48,87 @@ function ensureLogsBucketBinding() {
   return true
 }
 
+// === MEMORY + KV CACHING (SIMPLIFIED) ===
+
+// In-memory cache functions
+function getFromMemoryCache(key) {
+  const cached = memoryCache.get(key)
+  if (!cached) return null
+  
+  if (Date.now() > cached.expiry) {
+    memoryCache.delete(key)
+    return null
+  }
+  
+  console.log(`Memory cache HIT for: ${key}`)
+  return cached.data
+}
+
+function setMemoryCache(key, data, ttl = CACHE_TTL) {
+  memoryCache.set(key, {
+    data: data,
+    expiry: Date.now() + ttl
+  })
+  console.log(`Memory cached: ${key}`)
+}
+
+// Simple 2-tier caching: Memory + KV only (no Cloudflare Cache API)
+async function getCachedDataSimple(request, key, kvKey) {
+  try {
+    console.log(`getCachedDataSimple called: key=${key}, kvKey=${kvKey}`)
+    
+    // 1. Try memory cache first
+    const memCached = getFromMemoryCache(key)
+    if (memCached) {
+      console.log(`Memory cache hit for: ${key}`)
+      return {
+        data: memCached,
+        source: 'MEMORY',
+        response: jsonResponse(memCached, 200, { 
+          'Cache-Control': 'public, max-age=43200',
+          'X-Cache-Status': 'MEMORY-HIT'
+        })
+      }
+    }
+
+    // 2. Fetch from KV
+    if (!ensureEvergreenBinding()) {
+      throw new Error('KV binding not available')
+    }
+
+    console.log(`Fetching from KV: ${kvKey}`)
+    const data = await EVERGREEN.get(kvKey)
+    console.log(`KV response for ${kvKey}:`, data ? 'data found' : 'null')
+    
+    if (data === null) {
+      console.log(`No data found in KV for: ${kvKey}`)
+      return null
+    }
+
+    const parsed = safeJsonParse(data)
+    if (parsed === null) {
+      throw new Error(`Invalid JSON data for key: ${kvKey}`)
+    }
+
+    // Store in memory cache for next time
+    setMemoryCache(key, parsed)
+    
+    console.log(`Returning KV data for: ${kvKey}`)
+    return {
+      data: parsed,
+      source: 'KV',
+      response: jsonResponse(parsed, 200, { 
+        'Cache-Control': 'public, max-age=43200',
+        'X-Cache-Status': 'KV-MISS'
+      })
+    }
+  } catch (error) {
+    console.error(`Error in getCachedDataSimple for ${key}:`, error)
+    throw error
+  }
+}
+
+// R2 logging function
 async function storeLogToR2(request, startTime) {
   if (!ensureLogsBucketBinding()) {
     return
@@ -108,28 +194,27 @@ app.get("/app/:appId", async (req, res) => {
   console.log("Fetching app:", key)
 
   try {
-    const data = await EVERGREEN.get(key)
-
-    if (data === null) {
+    // Use 2-tier caching (memory + KV)
+    const cached = await getCachedDataSimple(req, `app:${key}`, key)
+    
+    if (cached === null) {
       console.log("No data found for app:", key)
       return jsonResponse({
         message: 'Application not found. Call /apps for a list of available applications.',
         documentation: 'https://eucpilots.com/evergreen-docs/api/'
-      }, 404)
+      }, 404, { 'X-Cache-Status': 'NOT-FOUND' })
     }
 
-    const parsed = safeJsonParse(data)
-    if (parsed === null) {
-      console.error(`Invalid JSON data for app: ${key}`)
-      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
-    }
-
-    console.log("Returning data for app:", key)
-    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+    console.log(`Returning data for app: ${key} from ${cached.source} cache`)
+    return cached.response
 
   } catch (err) {
     console.error('Error fetching app data:', err)
-    return jsonResponse({ message: 'Internal server error' }, 500)
+    console.error('Error stack:', err.stack)
+    return jsonResponse({ 
+      message: 'Internal server error',
+      error: err.message 
+    }, 500, { 'X-Cache-Status': 'ERROR' })
   }
 });
 
@@ -142,24 +227,24 @@ app.get("/apps", async (req, res) => {
   console.log("get all apps.")
 
   try {
-    const data = await EVERGREEN.get("_allapps")
-
-    if (data === null) {
+    // Use 2-tier caching (memory + KV)
+    const cached = await getCachedDataSimple(req, 'apps:all', '_allapps')
+    
+    if (cached === null) {
       console.log("No data found.")
-      return jsonResponse({ message: 'No apps available' }, 404)
+      return jsonResponse({ message: 'No apps available' }, 404, { 'X-Cache-Status': 'NOT-FOUND' })
     }
 
-    const parsed = safeJsonParse(data)
-    if (parsed === null) {
-      console.error('Invalid JSON data for _allapps')
-      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
-    }
-
-    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+    console.log(`Returning apps list from ${cached.source} cache`)
+    return cached.response
 
   } catch (err) {
     console.error('Error fetching apps list:', err)
-    return jsonResponse({ message: 'Internal server error' }, 500)
+    console.error('Error stack:', err.stack)
+    return jsonResponse({ 
+      message: 'Internal server error',
+      error: err.message 
+    }, 500, { 'X-Cache-Status': 'ERROR' })
   }
 });
 
@@ -179,27 +264,22 @@ app.get("/endpoints/versions", async (req, res) => {
   }
 
   console.log("get endpoints from Evergreen manifests.")
-  console.log(req.params)
 
   try {
-    const data = await EVERGREEN.get("endpoints-versions")
-
-    if (data === null) {
+    // Use 2-tier caching (memory + KV)
+    const cached = await getCachedDataSimple(req, 'endpoints:versions', 'endpoints-versions')
+    
+    if (cached === null) {
       console.log("No data found.")
-      return jsonResponse({ message: 'No endpoints data available' }, 404)
+      return jsonResponse({ message: 'No endpoints data available' }, 404, { 'X-Cache-Status': 'NOT-FOUND' })
     }
 
-    const parsed = safeJsonParse(data)
-    if (parsed === null) {
-      console.error('Invalid JSON data for endpoints-versions')
-      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
-    }
-
-    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+    console.log(`Returning endpoints/versions from ${cached.source} cache`)
+    return cached.response
 
   } catch (err) {
     console.error('Error fetching endpoints-versions:', err)
-    return jsonResponse({ message: 'Internal server error' }, 500)
+    return jsonResponse({ message: 'Internal server error' }, 500, { 'X-Cache-Status': 'ERROR' })
   }
 });
 
@@ -210,76 +290,123 @@ app.get("/endpoints/downloads", async (req, res) => {
   }
 
   console.log("get endpoints from downloads returned by Evergreen.")
-  console.log(req.params)
 
   try {
-    const data = await EVERGREEN.get("endpoints-downloads")
-
-    if (data === null) {
+    // Use 2-tier caching (memory + KV)
+    const cached = await getCachedDataSimple(req, 'endpoints:downloads', 'endpoints-downloads')
+    
+    if (cached === null) {
       console.log("No data found.")
-      return jsonResponse({ message: 'No endpoints data available' }, 404)
+      return jsonResponse({ message: 'No endpoints data available' }, 404, { 'X-Cache-Status': 'NOT-FOUND' })
     }
 
-    const parsed = safeJsonParse(data)
-    if (parsed === null) {
-      console.error('Invalid JSON data for endpoints-downloads')
-      return jsonResponse({ message: 'Stored data is corrupted' }, 500)
-    }
-
-    return jsonResponse(parsed, 200, { 'Cache-Control': 'public, max-age=300' })
+    console.log(`Returning endpoints/downloads from ${cached.source} cache`)
+    return cached.response
 
   } catch (err) {
     console.error('Error fetching endpoints-downloads:', err)
-    return jsonResponse({ message: 'Internal server error' }, 500)
+    return jsonResponse({ message: 'Internal server error' }, 500, { 'X-Cache-Status': 'ERROR' })
   }
 });
 
-// Health check endpoint for debugging
+// Health check endpoint with cache diagnostics
 app.get("/health", async (req, res) => {
-  const health = {
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    bindings: {
-      evergreen: typeof EVERGREEN !== 'undefined',
-      logsBucket: typeof LOGS_BUCKET !== 'undefined'
-    },
-    environment: typeof ENVIRONMENT !== 'undefined' ? ENVIRONMENT : 'unknown'
-  }
-
-  // Try to test KV access if available
-  if (typeof EVERGREEN !== 'undefined') {
-    try {
-      // Test if we can list keys (this will help identify if it's a permissions issue)
-      const testResult = await EVERGREEN.get('_allapps', { type: 'json' })
-      health.kvTest = {
-        accessible: true,
-        hasAllapps: testResult !== null,
-        allappsType: typeof testResult
-      }
-    } catch (error) {
-      health.kvTest = {
-        accessible: false,
-        error: error.message
+  try {
+    const health = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      bindings: {
+        evergreen: typeof EVERGREEN !== 'undefined',
+        logsBucket: typeof LOGS_BUCKET !== 'undefined'
+      },
+      environment: typeof ENVIRONMENT !== 'undefined' ? ENVIRONMENT : 'unknown',
+      cache: {
+        memorySize: memoryCache.size,
+        memoryKeys: Array.from(memoryCache.keys()),
+        ttlSeconds: CACHE_TTL / 1000,
+        ttlHours: CACHE_TTL / (1000 * 60 * 60)
       }
     }
-  }
 
-  console.log('Health check:', JSON.stringify(health, null, 2))
-  return jsonResponse(health, 200)
+    // Check for cache clearing request
+    let clearCache = false
+    try {
+      const url = new URL(req.url)
+      clearCache = url.searchParams.get('clear') === 'true'
+    } catch (e) {
+      // If URL parsing fails, just ignore the clear parameter
+      console.log('URL parsing failed, ignoring clear parameter')
+    }
+    
+    if (clearCache) {
+      memoryCache.clear()
+      health.cache.cleared = true
+      health.cache.memorySize = 0
+      health.cache.memoryKeys = []
+      console.log('Memory cache cleared via health endpoint')
+    }
+
+    // Try to test KV access if available
+    if (typeof EVERGREEN !== 'undefined') {
+      try {
+        console.log('Testing KV access...')
+        // Test if we can access the _allapps key
+        const testResult = await EVERGREEN.get('_allapps')
+        console.log('KV _allapps result:', testResult ? 'data found' : 'null')
+        
+        const parsedResult = testResult ? safeJsonParse(testResult) : null
+        console.log('Parsed result type:', typeof parsedResult)
+        
+        health.kvTest = {
+          accessible: true,
+          hasAllapps: testResult !== null,
+          allappsType: typeof parsedResult,
+          allappsLength: Array.isArray(parsedResult) ? parsedResult.length : 'not-array',
+          rawDataPreview: testResult ? testResult.substring(0, 100) : null
+        }
+      } catch (error) {
+        console.error('KV test error:', error)
+        health.kvTest = {
+          accessible: false,
+          error: error.message
+        }
+        health.status = 'warning'
+      }
+    } else {
+      health.kvTest = {
+        accessible: false,
+        error: 'EVERGREEN KV binding is not available'
+      }
+      health.status = 'warning'
+    }
+
+    console.log('Health check result:', JSON.stringify(health, null, 2))
+    return jsonResponse(health, 200, { 'X-Cache-Status': clearCache ? 'CLEARED' : 'INFO' })
+  } catch (error) {
+    console.error('Health check error:', error)
+    return jsonResponse({ 
+      status: 'error', 
+      message: 'Health check failed',
+      error: error.message 
+    }, 500)
+  }
 })
 
-// Return data for /*
+// Root endpoint
 app.get('/', async (req, res) => {
-  console.log(`Received request: ${req.method} ${req.url}`);
+  console.log(`Root endpoint called!`);
   return jsonResponse({
-    message: 'Method not found.',
-    documentation: 'https://eucpilots.com/evergreen-docs/api/'
-  }, 404)
+    message: 'Evergreen API with hybrid caching',
+    documentation: 'https://eucpilots.com/evergreen-docs/api/',
+    endpoints: ['/apps', '/app/{appId}', '/endpoints/versions', '/endpoints/downloads', '/health'],
+    caching: '2-tier: Memory + KV (12h TTL)'
+  })
 });
 
-// Responder
+// Event listener with R2 logging
 addEventListener('fetch', event => {
   const startTime = Date.now()
+  console.log('Event received:', event.request.method, event.request.url)
   
   event.respondWith(
     app.handleRequest(event.request).then(response => {

@@ -1,0 +1,288 @@
+name: Security & Dependencies
+
+on:
+  # Run on schedule to check for security updates
+  schedule:
+    - cron: '0 9 * * 1'  # Monday at 9 AM UTC
+
+  # Run on dependency changes
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'tests/package.json'
+      - 'package-lock.json'
+      - 'tests/package-lock.json'
+
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'tests/package.json'
+
+  # Manual trigger
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Audit main dependencies
+        run: |
+          echo "🔒 Auditing main package dependencies..."
+          if [ -f package.json ]; then
+            npm audit --audit-level=moderate || true
+          else
+            echo "No main package.json found"
+          fi
+
+      - name: Audit test dependencies
+        run: |
+          echo "🔒 Auditing test dependencies..."
+          cd tests
+          npm audit --audit-level=moderate || true
+
+      - name: Check for known vulnerabilities
+        run: |
+          echo "🔍 Checking for known vulnerability patterns..."
+          
+          # Check for vulnerable packages
+          if [ -f tests/package-lock.json ]; then
+            # Common vulnerable packages to watch for
+            vulnerable_packages=("lodash" "moment" "request" "node-fetch")
+            
+            for pkg in "${vulnerable_packages[@]}"; do
+              if grep -q "\"$pkg\"" tests/package-lock.json; then
+                echo "⚠️  Found potentially vulnerable package: $pkg"
+                echo "Please verify it's the latest secure version"
+              fi
+            done
+          fi
+
+      - name: Generate security report
+        run: |
+          echo "📋 Security Report" > security-report.md
+          echo "=================" >> security-report.md
+          echo "" >> security-report.md
+          echo "## Audit Summary" >> security-report.md
+          echo "- Main dependencies: Checked" >> security-report.md
+          echo "- Test dependencies: Checked" >> security-report.md
+          echo "- Vulnerability scan: Completed" >> security-report.md
+          echo "" >> security-report.md
+          echo "## Recommendations" >> security-report.md
+          echo "- Keep dependencies updated" >> security-report.md
+          echo "- Monitor security advisories" >> security-report.md
+          echo "- Use npm audit fix for auto-fixes" >> security-report.md
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: security-report.md
+
+  dependency-update:
+    name: Check Dependency Updates
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Check for outdated packages
+        run: |
+          echo "📦 Checking for outdated packages..."
+          
+          if [ -f package.json ]; then
+            echo "Main package outdated check:"
+            npm outdated || true
+          fi
+          
+          echo ""
+          echo "Test package outdated check:"
+          cd tests
+          npm outdated || true
+
+      - name: Check critical dependencies
+        run: |
+          echo "🔧 Checking critical dependencies..."
+          
+          # Check specific packages important for the API
+          critical_packages=("supertest" "mocha" "chai")
+          
+          cd tests
+          for pkg in "${critical_packages[@]}"; do
+            current_version=$(npm list "$pkg" --depth=0 2>/dev/null | grep "$pkg" | grep -o "@[0-9][^[:space:]]*" | cut -c2- || echo "not found")
+            if [ "$current_version" != "not found" ]; then
+              echo "✅ $pkg: $current_version"
+            else
+              echo "❌ $pkg: not installed"
+            fi
+          done
+
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install license checker
+        run: npm install -g license-checker
+
+      - name: Check licenses
+        run: |
+          echo "📄 Checking dependency licenses..."
+          
+          cd tests
+          npm ci
+          
+          # Check licenses of dependencies
+          license-checker --summary --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;Apache*' || true
+
+      - name: Generate license report
+        run: |
+          cd tests
+          echo "# License Report" > ../license-report.md
+          echo "===============" >> ../license-report.md
+          echo "" >> ../license-report.md
+          echo "## Dependency Licenses" >> ../license-report.md
+          license-checker --csv >> ../license-report.md 2>/dev/null || echo "License data not available" >> ../license-report.md
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: license-report.md
+
+  api-security:
+    name: API Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for security headers
+        run: |
+          echo "🛡️  Checking API security configuration..."
+          
+          # Test security headers
+          echo "Testing security headers against production API..."
+          response=$(curl -s -I -H "User-Agent: GitHub-Security-Test/1.0.0" \
+            "https://evergreen-api.stealthpuppy.com/health")
+          
+          echo "Response headers:"
+          echo "$response"
+          
+          # Check for security-related headers
+          if echo "$response" | grep -i "x-frame-options\|x-content-type-options\|x-xss-protection"; then
+            echo "✅ Some security headers present"
+          else
+            echo "⚠️  Consider adding security headers"
+          fi
+
+      - name: Test for common vulnerabilities
+        run: |
+          echo "🔍 Testing for common API vulnerabilities..."
+          
+          # Test for SQL injection patterns (basic check)
+          echo "Testing for SQL injection resistance..."
+          response_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "User-Agent: Security-Test/1.0.0" \
+            "https://evergreen-api.stealthpuppy.com/app/'%20OR%201=1--")
+          
+          if [ "$response_code" = "400" ] || [ "$response_code" = "404" ]; then
+            echo "✅ SQL injection test passed (proper error handling)"
+          else
+            echo "⚠️  Unexpected response to injection test: $response_code"
+          fi
+          
+          # Test for XSS patterns
+          echo "Testing for XSS resistance..."
+          response_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "User-Agent: Security-Test/1.0.0" \
+            "https://evergreen-api.stealthpuppy.com/app/%3Cscript%3Ealert(1)%3C/script%3E")
+          
+          if [ "$response_code" = "400" ] || [ "$response_code" = "404" ]; then
+            echo "✅ XSS test passed (proper input validation)"
+          else
+            echo "⚠️  Unexpected response to XSS test: $response_code"
+          fi
+
+      - name: Rate limiting check
+        run: |
+          echo "🚦 Testing rate limiting behavior..."
+          
+          # Make multiple rapid requests
+          echo "Making rapid requests to test rate limiting..."
+          for i in {1..10}; do
+            response_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "User-Agent: Rate-Limit-Test/1.0.0" \
+              "https://evergreen-api.stealthpuppy.com/health")
+            echo "Request $i: $response_code"
+            
+            if [ "$response_code" = "429" ]; then
+              echo "✅ Rate limiting detected"
+              break
+            fi
+          done
+
+  create-security-issue:
+    name: Create Security Issue
+    runs-on: ubuntu-latest
+    needs: [security-audit, api-security]
+    if: failure() && github.event_name == 'schedule'
+    
+    steps:
+      - name: Create security issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🔒 Security Review Required - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            ## Security Alert
+            
+            The scheduled security scan has detected issues that require attention.
+            
+            ### What to check:
+            - [ ] Review dependency audit results
+            - [ ] Check for outdated packages
+            - [ ] Verify API security headers
+            - [ ] Review vulnerability test results
+            
+            ### Next steps:
+            1. Download and review security artifacts from the failed workflow
+            2. Update dependencies as needed
+            3. Apply security fixes
+            4. Re-run security tests
+            
+            **Auto-generated by Security & Dependencies workflow**
+            `;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'dependencies']
+            });

@@ -3,16 +3,16 @@ permissions:
   contents: read
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/deploy-worker.yml"
-      - "src/index.js"
-      - "wrangler.toml"
-      - "package.json"
-      - "package-lock.json"
+   workflow_dispatch:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - ".github/workflows/deploy-worker.yml"
+#       - "src/index.js"
+#       - "wrangler.toml"
+#       - "package.json"
+#       - "package-lock.json"
 
 jobs:
   deploy:
