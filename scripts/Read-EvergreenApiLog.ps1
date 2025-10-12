@@ -33,21 +33,20 @@ $ListRequest.Prefix = $Path
 
 Write-Information -MessageData "$($PSStyle.Foreground.Cyan)Retrieve log files from: $($Auth.Bucket)/$Path"
 $ListResponse = $S3Client.ListObjectsV2Async($ListRequest).Result
-# $ListResponse.S3Objects | ForEach-Object { $_.Key }
 
 Write-Information -MessageData "$($PSStyle.Foreground.Cyan)Found $($ListResponse.S3Objects.Count) log files"
-$Logs = foreach ($Object in $ListResponse.S3Objects) {
-    $GetRequest = New-Object Amazon.S3.Model.GetObjectRequest
+Write-Information -MessageData "$($PSStyle.Foreground.Cyan)Reading log files$($PSStyle.Reset)"
+$Logs = $ListResponse.S3Objects | ForEach-Object {
+    $GetRequest = New-Object -TypeName "Amazon.S3.Model.GetObjectRequest"
     $GetRequest.BucketName = $Auth.Bucket
-    $GetRequest.Key = $Object.Key
-
+    $GetRequest.Key = $_.Key
     $GetResponse = $S3Client.GetObjectAsync($GetRequest).Result
 
     # Read the object’s content as text
     $Reader = New-Object -TypeName "System.IO.StreamReader"($GetResponse.ResponseStream)
     $Content = $Reader.ReadToEnd()
     $Reader.Close()
-    $Content | ConvertFrom-Json
+    if ($Content -notmatch "EvergreenAPI_Tests|Rate-Limit-Test|GitHub-Actions-Performance-Test|Security-Test") { $Content | ConvertFrom-Json }
 }
-Write-Information -MessageData "$($PSStyle.Reset)"
-$Logs | Select-Object -Property path, connectingIp, country, region, asOrganisation, userAgent | Format-Table -AutoSize
+$Logs | Sort-Object -Property timestamp -Descending | `
+Select-Object -Property path, connectingIp, country, region, asOrganisation, userAgent | Format-Table -AutoSize
