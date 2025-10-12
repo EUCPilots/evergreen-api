@@ -5,6 +5,13 @@ info:
     An API that provides evergreen application versions and URLs for the latest releases of popular software applications.
     
     The Evergreen API helps system administrators and IT professionals stay up-to-date with the latest software versions by providing programmatic access to version information and download URLs.
+    
+    ## Authentication
+    No authentication is required, but all requests must include a custom User-Agent header for identification and tracking purposes.
+    
+    ## User-Agent Requirement
+    All API requests must include a custom User-Agent header following the format "company/location" or similar descriptive pattern.
+    Examples: "ACME-Corp/NewYork", "TechServices/CloudOps", "PersonalProject/HomeOffice"
   version: "1.5.2"
   contact:
     name: EUC Pilots
@@ -55,6 +62,7 @@ paths:
         Returns version information and download URLs for a specific application.
         Application IDs are case-insensitive and should match the names returned by the `/apps` endpoint.
       parameters:
+        - $ref: '#/components/parameters/UserAgent'
         - name: appId
           in: path
           required: true
@@ -93,6 +101,8 @@ paths:
       description: |
         Returns a list of all supported applications with their names, display names, and vendor URLs.
         This endpoint is useful for discovering available applications before querying specific application details.
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
       responses:
         '200':
           description: List of supported applications
@@ -108,6 +118,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ApplicationSummary'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
@@ -156,6 +168,8 @@ paths:
       description: |
         Returns the list of endpoints (hostnames) used by Evergreen when checking for application versions.
         These are the external services that Evergreen queries to determine the latest version information.
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
       responses:
         '200':
           description: List of version check endpoints
@@ -171,6 +185,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VersionEndpoint'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
@@ -184,6 +200,8 @@ paths:
       description: |
         Returns the list of endpoints (hostnames) used by Evergreen when downloading application installers.
         These are the external services that host the actual application download files.
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
       responses:
         '200':
           description: List of download endpoints
@@ -199,12 +217,40 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DownloadEndpoint'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
 components:
+  parameters:
+    UserAgent:
+      name: User-Agent
+      in: header
+      required: true
+      description: |
+        Custom user agent string for identification and tracking purposes.
+        Should follow the format "company/location" or similar descriptive pattern.
+        This helps identify the source of API requests for analytics and support purposes.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9\-._/\s]*[A-Za-z0-9]$'
+        minLength: 3
+        maxLength: 100
+        example: "company/location"
+      examples:
+        corporate:
+          summary: Corporate usage
+          value: "ACME-Corp/NewYork"
+        msp:
+          summary: Managed Service Provider
+          value: "TechServices/CloudOps"
+        personal:
+          summary: Personal project
+          value: "PersonalProject/HomeOffice"
+
   schemas:
     ApplicationSummary:
       type: object
@@ -406,6 +452,11 @@ components:
               summary: Missing application name
               value:
                 message: "Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications."
+                documentation: "https://eucpilots.com/evergreen-docs/api/"
+            invalidUserAgent:
+              summary: Invalid or missing User-Agent header
+              value:
+                message: "Invalid or missing User-Agent header. Please provide a custom User-Agent in the format 'company/location'."
                 documentation: "https://eucpilots.com/evergreen-docs/api/"
 
     ApplicationNotFoundError:
