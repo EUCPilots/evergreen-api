@@ -8,15 +8,15 @@ on:
   # Run on dependency changes
   pull_request:
     paths:
-      - 'package.json'
+      - 'src/package.json'
       - 'tests/package.json'
-      - 'package-lock.json'
+      - 'src/package-lock.json'
       - 'tests/package-lock.json'
 
   push:
     branches: [main]
     paths:
-      - 'package.json'
+      - 'src/package.json'
       - 'tests/package.json'
 
   # Manual trigger
@@ -39,10 +39,11 @@ jobs:
       - name: Audit main dependencies
         run: |
           echo "🔒 Auditing main package dependencies..."
-          if [ -f package.json ]; then
+          if [ -f src/package.json ]; then
+            cd src
             npm audit --audit-level=moderate || true
           else
-            echo "No main package.json found"
+            echo "No src/package.json found"
           fi
 
       - name: Audit test dependencies
@@ -106,9 +107,11 @@ jobs:
         run: |
           echo "📦 Checking for outdated packages..."
           
-          if [ -f package.json ]; then
+          if [ -f src/package.json ]; then
             echo "Main package outdated check:"
+            cd src
             npm outdated || true
+            cd ..
           fi
           
           echo ""
