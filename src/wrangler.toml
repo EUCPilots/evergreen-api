@@ -4,6 +4,10 @@ workers_dev = true
 compatibility_date = "2022-05-30"
 account_id = "3f3a99ad15db52fca58be0e080912991"
 vars = { ENVIRONMENT = "production" }
+
+# Enable observability features
+observability = { enabled = true }
+
 kv_namespaces = [
     { binding = "EVERGREEN", id = "037069e7da3e4944be2cbc97c92409a5", preview_id = "037069e7da3e4944be2cbc97c92409a5" }
 ]
@@ -18,7 +22,6 @@ kv_namespaces = [
 [[env.production.r2_buckets]]
 binding = "LOGS_BUCKET"
 bucket_name = "evergreen-api"
-preview_bucket_name = "evergreen-api-test"
 
 [env.staging]
 name = "evergreen-api-staging"
