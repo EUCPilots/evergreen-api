@@ -4,9 +4,6 @@ workers_dev = true
 compatibility_date = "2022-05-30"
 account_id = "3f3a99ad15db52fca58be0e080912991"
 vars = { ENVIRONMENT = "production" }
-routes = [
-    "evergreen-api.stealthpuppy.com/*"
-]
 kv_namespaces = [
     { binding = "EVERGREEN", id = "037069e7da3e4944be2cbc97c92409a5", preview_id = "037069e7da3e4944be2cbc97c92409a5" }
 ]
@@ -19,9 +16,6 @@ preview_bucket_name = "evergreen-api-test"
 [env.production]
 name = "evergreen-api"
 vars = { ENVIRONMENT = "production" }
-routes = [
-    "evergreen-api.stealthpuppy.workers.dev/*"
-]
 kv_namespaces = [
     { binding = "EVERGREEN", id = "037069e7da3e4944be2cbc97c92409a5", preview_id = "037069e7da3e4944be2cbc97c92409a5" }
 ]
@@ -34,9 +28,6 @@ preview_bucket_name = "evergreen-api-test"
 [env.staging]
 name = "evergreen-api-staging"
 vars = { ENVIRONMENT = "staging" }
-routes = [
-    "evergreen-api-staging.stealthpuppy.workers.dev/*"
-]
 kv_namespaces = [
     { binding = "EVERGREEN", id = "037069e7da3e4944be2cbc97c92409a5", preview_id = "037069e7da3e4944be2cbc97c92409a5" }
 ]
