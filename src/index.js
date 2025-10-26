@@ -129,8 +129,8 @@ async function getCachedDataSimple(request, key, kvKey) {
 }
 
 // R2 logging function - only logs requests to valid endpoints
-async function storeLogToR2(request, startTime, shouldLog = true) {
-  if (!ensureLogsBucketBinding() || !shouldLog) {
+async function storeLogToR2(request, startTime) {
+  if (!ensureLogsBucketBinding()) {
     return
   }
 
