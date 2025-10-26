@@ -423,7 +423,7 @@ addEventListener('fetch', event => {
       // Store log to R2 asynchronously (don't await to avoid delaying response)
       // Only log if it's a valid endpoint
       if (shouldLog) {
-        event.waitUntil(storeLogToR2(event.request, startTime, true))
+        event.waitUntil(storeLogToR2(event.request, startTime))
       }
       return response
     })
