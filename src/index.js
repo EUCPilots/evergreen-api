@@ -128,9 +128,9 @@ async function getCachedDataSimple(request, key, kvKey) {
   }
 }
 
-// R2 logging function
-async function storeLogToR2(request, startTime) {
-  if (!ensureLogsBucketBinding()) {
+// R2 logging function - only logs requests to valid endpoints
+async function storeLogToR2(request, startTime, shouldLog = true) {
+  if (!ensureLogsBucketBinding() || !shouldLog) {
     return
   }
 
@@ -406,12 +406,25 @@ app.get('/', async (req, res) => {
 // Event listener with R2 logging
 addEventListener('fetch', event => {
   const startTime = Date.now()
+  const url = new URL(event.request.url)
+  const path = url.pathname
+  
   console.log('Event received:', event.request.method, event.request.url)
+  
+  // Determine if this request should be logged to R2
+  // Only log requests to main API endpoints, exclude health checks and invalid paths
+  const validEndpoints = ['/apps', '/app/', '/endpoints/versions', '/endpoints/downloads']
+  const shouldLog = validEndpoints.some(endpoint => 
+    path === endpoint || path.startsWith(endpoint)
+  ) && path !== '/health'
   
   event.respondWith(
     app.handleRequest(event.request).then(response => {
       // Store log to R2 asynchronously (don't await to avoid delaying response)
-      event.waitUntil(storeLogToR2(event.request, startTime))
+      // Only log if it's a valid endpoint
+      if (shouldLog) {
+        event.waitUntil(storeLogToR2(event.request, startTime, true))
+      }
       return response
     })
   )
