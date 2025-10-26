@@ -1,5 +1,5 @@
 name = "evergreen-api"
-main = "src/index.js"
+main = "index.js"
 workers_dev = true
 compatibility_date = "2022-05-30"
 account_id = "3f3a99ad15db52fca58be0e080912991"

@@ -4,16 +4,14 @@ on:
   # Run when caching-related files change
   pull_request:
     paths:
-      - 'src/index.js'
+      - 'src/**'
       - 'tests/test.js'
-      - 'wrangler.toml'
   
   push:
     branches: [main, cache]
     paths:
-      - 'src/index.js'
+      - 'src/**'
       - 'tests/test.js'
-      - 'wrangler.toml'
 
   # Manual trigger for cache testing
   workflow_dispatch:
@@ -181,14 +179,14 @@ jobs:
           echo "🔧 Checking deployment configuration..."
           
           # Check wrangler.toml for required bindings
-          if grep -q "binding.*EVERGREEN" wrangler.toml; then
+          if grep -q "binding.*EVERGREEN" src/wrangler.toml; then
             echo "✅ EVERGREEN KV binding configured"
           else
             echo "❌ EVERGREEN KV binding missing"
             exit 1
           fi
           
-          if grep -q "binding.*LOGS_BUCKET" wrangler.toml; then
+          if grep -q "binding.*LOGS_BUCKET" src/wrangler.toml; then
             echo "✅ LOGS_BUCKET R2 binding configured"
           else
             echo "❌ LOGS_BUCKET R2 binding missing"

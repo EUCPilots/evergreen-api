@@ -7,8 +7,6 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
-      - 'package.json'
-      - 'wrangler.toml'
 
   # Run tests on pushes to main and development branches
   push:
@@ -16,8 +14,6 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
-      - 'package.json'
-      - 'wrangler.toml'
 
   # Allow manual workflow runs
   workflow_dispatch:
@@ -92,9 +88,9 @@ jobs:
       - name: Check JSON files
         run: |
           # Validate JSON files
-          if [ -f package.json ]; then
-            echo "Validating package.json..."
-            python3 -m json.tool package.json > /dev/null
+          if [ -f src/package.json ]; then
+            echo "Validating src/package.json..."
+            python3 -m json.tool src/package.json > /dev/null
           fi
           
           if [ -f tests/package.json ]; then
@@ -108,15 +104,15 @@ jobs:
           npm install -g toml-test-runner || npm install -g @taplo/cli || true
           
           # Validate wrangler.toml with alternative methods
-          if [ -f wrangler.toml ]; then
-            echo "Validating wrangler.toml..."
+          if [ -f src/wrangler.toml ]; then
+            echo "Validating src/wrangler.toml..."
             
             # Method 1: Try with Node.js TOML parser
             if command -v node >/dev/null 2>&1; then
               node -e "
                 try {
                   const fs = require('fs');
-                  const content = fs.readFileSync('wrangler.toml', 'utf8');
+                  const content = fs.readFileSync('src/wrangler.toml', 'utf8');
                   
                   // Basic TOML syntax check - look for common issues
                   const lines = content.split('\n');
@@ -152,15 +148,15 @@ jobs:
                   
                   // Check required fields
                   if (!content.includes('name')) {
-                    console.warn('Warning: No name field found in wrangler.toml');
+                    console.warn('Warning: No name field found in src/wrangler.toml');
                   }
                   if (!content.includes('main')) {
-                    console.warn('Warning: No main field found in wrangler.toml');
+                    console.warn('Warning: No main field found in src/wrangler.toml');
                   }
                   
-                  console.log('✅ wrangler.toml: Basic validation passed');
+                  console.log('✅ src/wrangler.toml: Basic validation passed');
                 } catch (error) {
-                  console.error('❌ wrangler.toml: Validation failed -', error.message);
+                  console.error('❌ src/wrangler.toml: Validation failed -', error.message);
                   process.exit(1);
                 }
               "
@@ -172,14 +168,14 @@ jobs:
             echo "Running basic TOML structure checks..."
             
             # Check for required Cloudflare Workers fields
-            if grep -q "^name\s*=" wrangler.toml; then
+            if grep -q "^name\s*=" src/wrangler.toml; then
               echo "  ✅ 'name' field found"
             else
               echo "  ❌ 'name' field missing"
               exit 1
             fi
             
-            if grep -q "^main\s*=" wrangler.toml; then
+            if grep -q "^main\s*=" src/wrangler.toml; then
               echo "  ✅ 'main' field found"
             else
               echo "  ❌ 'main' field missing"
@@ -187,22 +183,22 @@ jobs:
             fi
             
             # Check for KV namespace binding
-            if grep -q "kv_namespaces" wrangler.toml; then
+            if grep -q "kv_namespaces" src/wrangler.toml; then
               echo "  ✅ KV namespaces configured"
             else
               echo "  ⚠️ No KV namespaces found"
             fi
             
             # Check for R2 bucket binding
-            if grep -q "r2_buckets" wrangler.toml; then
+            if grep -q "r2_buckets" src/wrangler.toml; then
               echo "  ✅ R2 buckets configured"
             else
               echo "  ⚠️ No R2 buckets found"
             fi
             
-            echo "✅ wrangler.toml validation completed"
+            echo "✅ src/wrangler.toml validation completed"
           else
-            echo "ℹ️ No wrangler.toml file found"
+            echo "ℹ️ No src/wrangler.toml file found"
           fi
 
   security:
