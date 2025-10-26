@@ -26,10 +26,16 @@ on:
           - staging
           - local
 
+# Set minimal permissions at workflow level
+permissions:
+  contents: read
+
 jobs:
   cache-validation:
     name: Validate Caching Implementation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout
     
     steps:
       - name: Checkout code
@@ -169,6 +175,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: cache-validation
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read  # Required for checkout
     
     steps:
       - name: Checkout code
