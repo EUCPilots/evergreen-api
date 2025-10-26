@@ -413,10 +413,13 @@ addEventListener('fetch', event => {
   
   // Determine if this request should be logged to R2
   // Only log requests to main API endpoints, exclude health checks and invalid paths
-  const validEndpoints = ['/apps', '/app/', '/endpoints/versions', '/endpoints/downloads']
-  const shouldLog = validEndpoints.some(endpoint => 
-    path === endpoint || path.startsWith(endpoint)
-  ) && path !== '/health'
+  // Define exact match endpoints and prefix match endpoints separately
+  const exactEndpoints = ['/apps', '/app', '/endpoints/versions', '/endpoints/downloads'];
+  const prefixEndpoints = ['/app/', '/apps/', '/endpoints/versions/', '/endpoints/downloads/'];
+  const shouldLog = (
+    exactEndpoints.includes(path) ||
+    prefixEndpoints.some(endpoint => path.startsWith(endpoint))
+  ) && path !== '/health';
   
   event.respondWith(
     app.handleRequest(event.request).then(response => {
