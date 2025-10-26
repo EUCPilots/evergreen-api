@@ -12,6 +12,11 @@ kv_namespaces = [
     { binding = "EVERGREEN", id = "037069e7da3e4944be2cbc97c92409a5", preview_id = "037069e7da3e4944be2cbc97c92409a5" }
 ]
 
+# R2 bucket binding for default (production) deployment
+[[r2_buckets]]
+binding = "LOGS_BUCKET"
+bucket_name = "evergreen-api"
+
 [env.production]
 name = "evergreen-api"
 vars = { ENVIRONMENT = "production" }
@@ -32,5 +37,5 @@ kv_namespaces = [
 
 [[env.staging.r2_buckets]]
 binding = "LOGS_BUCKET"
-bucket_name = "evergreen-api"
+bucket_name = "evergreen-api-staging"
 preview_bucket_name = "evergreen-api-test"
