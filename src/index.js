@@ -26,8 +26,8 @@ function safeJsonParse(raw) {
 
 function validateAppId(appId) {
   if (!appId || typeof appId !== 'string') return false
-  // Allow letters, numbers, dashes and underscores; max length to avoid abuse
-  return /^[A-Za-z0-9-_]{1,64}$/.test(appId)
+  // Allow letters, numbers, dashes, underscores, and dots; max length to avoid abuse
+  return /^[A-Za-z0-9-_.]{1,64}$/.test(appId)
 }
 
 function ensureEvergreenBinding() {
