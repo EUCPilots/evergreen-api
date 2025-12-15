@@ -163,7 +163,7 @@ jobs:
           cat cache-report.md
 
       - name: Upload cache validation results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cache-validation-results
           path: |
