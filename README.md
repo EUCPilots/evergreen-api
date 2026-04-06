@@ -105,7 +105,7 @@ wrangler deploy --env production
 
 ## 📚 Documentation
 
-- [API Documentation](https://eucpilots.com/evergreen-docs/api/)
+- [API Documentation](https://eucpilots.com/evergreen/api/)
 - [OpenAPI Schema](./schema/openapi.yml)
 - [Workflow Documentation](./.github/workflows/README.md)
 - [Caching Implementation](./docs/caching.md)

@@ -171,7 +171,7 @@ async function storeLogToR2(request, startTime) {
 app.get("/app", async (req, res) => {
   return jsonResponse({
     message: 'Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications.',
-    documentation: 'https://eucpilots.com/evergreen-docs/api/'
+    documentation: 'https://eucpilots.com/evergreen/api/'
   }, 400)
 })
 
@@ -185,7 +185,7 @@ app.get("/app/:appId", async (req, res) => {
   if (!validateAppId(rawAppId)) {
     return jsonResponse({
       message: 'Invalid application name. Call /apps for a list of available applications.',
-      documentation: 'https://eucpilots.com/evergreen-docs/api/'
+      documentation: 'https://eucpilots.com/evergreen/api/'
     }, 400)
   }
 
@@ -201,7 +201,7 @@ app.get("/app/:appId", async (req, res) => {
       console.log("No data found for app:", key)
       return jsonResponse({
         message: 'Application not found. Call /apps for a list of available applications.',
-        documentation: 'https://eucpilots.com/evergreen-docs/api/'
+        documentation: 'https://eucpilots.com/evergreen/api/'
       }, 404, { 'X-Cache-Status': 'NOT-FOUND' })
     }
 
@@ -253,7 +253,7 @@ app.get('/endpoints', async (req, res) => {
   console.log("GET /endpoints called");
   return jsonResponse({
     message: 'Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.',
-    documentation: 'https://eucpilots.com/evergreen-docs/api/'
+    documentation: 'https://eucpilots.com/evergreen/api/'
   }, 404)
 });
 
@@ -397,7 +397,7 @@ app.get('/', async (req, res) => {
   console.log(`Root endpoint called!`);
   return jsonResponse({
     message: 'Evergreen API with hybrid caching',
-    documentation: 'https://eucpilots.com/evergreen-docs/api/',
+    documentation: 'https://eucpilots.com/evergreen/api/',
     endpoints: ['/apps', '/app/{appId}', '/endpoints/versions', '/endpoints/downloads', '/health'],
     caching: '2-tier: Memory + KV (12h TTL)'
   })

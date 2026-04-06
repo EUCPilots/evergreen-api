@@ -15,7 +15,7 @@ info:
   version: "1.5.3"
   contact:
     name: EUC Pilots
-    url: https://eucpilots.com/evergreen-docs/api/
+    url: https://eucpilots.com/evergreen/api/
   license:
     name: Apache 2.0
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
@@ -360,7 +360,7 @@ components:
           type: string
           format: uri
           description: Link to API documentation
-          example: "https://eucpilots.com/evergreen-docs/api/"
+          example: "https://eucpilots.com/evergreen/api/"
 
     ErrorResponse:
       type: object
@@ -375,7 +375,7 @@ components:
           type: string
           format: uri
           description: Link to API documentation
-          example: "https://eucpilots.com/evergreen-docs/api/"
+          example: "https://eucpilots.com/evergreen/api/"
 
     HealthStatus:
       type: object
@@ -447,17 +447,17 @@ components:
               summary: Invalid application name
               value:
                 message: "Invalid application name. Call /apps for a list of available applications."
-                documentation: "https://eucpilots.com/evergreen-docs/api/"
+                documentation: "https://eucpilots.com/evergreen/api/"
             missingAppName:
               summary: Missing application name
               value:
                 message: "Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications."
-                documentation: "https://eucpilots.com/evergreen-docs/api/"
+                documentation: "https://eucpilots.com/evergreen/api/"
             invalidUserAgent:
               summary: Invalid or missing User-Agent header
               value:
                 message: "Invalid or missing User-Agent header. Please provide a custom User-Agent in the format 'company/location'."
-                documentation: "https://eucpilots.com/evergreen-docs/api/"
+                documentation: "https://eucpilots.com/evergreen/api/"
 
     ApplicationNotFoundError:
       description: Application not found
@@ -467,7 +467,7 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             message: "Application not found. Call /apps for a list of available applications."
-            documentation: "https://eucpilots.com/evergreen-docs/api/"
+            documentation: "https://eucpilots.com/evergreen/api/"
 
     NotFoundError:
       description: Resource not found
@@ -480,7 +480,7 @@ components:
               summary: Method not found
               value:
                 message: "Method not found."
-                documentation: "https://eucpilots.com/evergreen-docs/api/"
+                documentation: "https://eucpilots.com/evergreen/api/"
             noDataAvailable:
               summary: No data available
               value:
