@@ -28,9 +28,9 @@
   ],
   "dependencies": {
     "cloudflare-worker-rest-api": "^1.0.0",
-    "jsonwebtoken": "^9.0.0"
+    "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
-    "wrangler": "^4.59.1"
+    "wrangler": "^4.94.0"
   }
 }
