@@ -31,6 +31,6 @@
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
-    "wrangler": "^4.94.0"
+    "wrangler": "^4.103.0"
   }
 }
