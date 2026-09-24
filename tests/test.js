@@ -1,6 +1,11 @@
 const baseUrl = process.env.API_BASE_URL || 'https://evergreen-api.stealthpuppy.com';
 const request = require('supertest')(baseUrl);
-const assert = require('chai').assert;
+let assert;
+
+before(async () => {
+    const chai = await import('chai');
+    assert = chai.assert;
+});
 
 // Test configuration
 const TEST_USER_AGENT = 'EvergreenAPI_Tests/1.0.0';
