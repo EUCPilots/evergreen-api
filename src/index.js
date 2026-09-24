@@ -281,8 +281,7 @@ app.get("/app/:appId", async (req, res) => {
     console.error('Error fetching app data:', err)
     console.error('Error stack:', err.stack)
     return jsonResponse({ 
-      message: 'Internal server error',
-      error: err.message 
+      message: 'Internal server error'
     }, 500, { 'X-Cache-Status': 'ERROR' })
   }
 });
@@ -315,8 +314,7 @@ app.get("/apps", async (req, res) => {
     console.error('Error fetching apps list:', err)
     console.error('Error stack:', err.stack)
     return jsonResponse({ 
-      message: 'Internal server error',
-      error: err.message 
+      message: 'Internal server error'
     }, 500, { 'X-Cache-Status': 'ERROR' })
   }
 });
@@ -473,8 +471,7 @@ app.get("/health", async (req, res) => {
     console.error('Health check error:', error)
     return jsonResponse({ 
       status: 'error', 
-      message: 'Health check failed',
-      error: error.message 
+      message: 'Health check failed'
     }, 500)
   }
 })
