@@ -30,6 +30,67 @@ function validateAppId(appId) {
   return /^[A-Za-z0-9-_.]{1,64}$/.test(appId)
 }
 
+function validateUserAgent(userAgent) {
+  if (!userAgent || typeof userAgent !== 'string') return false
+
+  const trimmedUserAgent = userAgent.trim()
+  if (trimmedUserAgent.length < 3 || trimmedUserAgent.length > 100) return false
+
+  if (!/^[A-Za-z0-9][A-Za-z0-9\-._/\s]*[A-Za-z0-9]$/.test(trimmedUserAgent)) {
+    return false
+  }
+
+  if (!trimmedUserAgent.includes('/')) {
+    return false
+  }
+
+  const normalized = trimmedUserAgent.toLowerCase()
+  const blockedPrefixes = [
+    'curl/', 'wget/', 'superagent/', 'node-superagent/', 'axios/', 'fetch/',
+    'mozilla/', 'chrome/', 'firefox/', 'safari/', 'edge/', 'msie/',
+    'postman/', 'insomnia/', 'python-requests/', 'httpie/', 'okhttp/',
+    'go-http-client/', 'java/', 'apache-httpclient/'
+  ]
+
+  if (blockedPrefixes.some(prefix => normalized.startsWith(prefix))) {
+    return false
+  }
+
+  return true
+}
+
+function getRequestUserAgent(req) {
+  const headers = req && (req.headers || (req.request && req.request.headers))
+
+  if (!headers) {
+    return ''
+  }
+
+  if (typeof headers.get === 'function') {
+    return headers.get('User-Agent') || headers.get('user-agent') || ''
+  }
+
+  if (typeof headers === 'object') {
+    if (Array.isArray(headers['User-Agent'])) {
+      return headers['User-Agent'][0] || ''
+    }
+    if (Array.isArray(headers['user-agent'])) {
+      return headers['user-agent'][0] || ''
+    }
+
+    return headers['User-Agent'] || headers['user-agent'] || ''
+  }
+
+  return ''
+}
+
+function userAgentRequiredResponse() {
+  return jsonResponse({
+    message: 'A valid User-Agent header is required. Please include a custom User-Agent in the format "company/location" or similar descriptive pattern.',
+    documentation: 'https://eucpilots.com/evergreen/api/'
+  }, 400)
+}
+
 function ensureEvergreenBinding() {
   console.log('Checking EVERGREEN binding...', typeof EVERGREEN)
   if (typeof EVERGREEN === 'undefined') {
@@ -169,6 +230,10 @@ async function storeLogToR2(request, startTime) {
 
 // Handle /app endpoint without application name
 app.get("/app", async (req, res) => {
+  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
+
   return jsonResponse({
     message: 'Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications.',
     documentation: 'https://eucpilots.com/evergreen/api/'
@@ -177,6 +242,10 @@ app.get("/app", async (req, res) => {
 
 // Returns data for a specific app
 app.get("/app/:appId", async (req, res) => {
+  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
+
   if (!ensureEvergreenBinding()) {
     return jsonResponse({ message: 'Server configuration error' }, 500)
   }
@@ -220,6 +289,10 @@ app.get("/app/:appId", async (req, res) => {
 
 // Returns data for all supported apps
 app.get("/apps", async (req, res) => {
+  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
+
   if (!ensureEvergreenBinding()) {
     return jsonResponse({ message: 'Server configuration error' }, 500)
   }
@@ -249,7 +322,9 @@ app.get("/apps", async (req, res) => {
 });
 
 // Return a message if someone calls /endpoints
-app.get('/endpoints', async (req, res) => {
+app.get('/endpoints', async (req, res) => {  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
   console.log("GET /endpoints called");
   return jsonResponse({
     message: 'Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads.',
@@ -259,6 +334,10 @@ app.get('/endpoints', async (req, res) => {
 
 // Returns endpoints data for URLs used by Evergreen when finding application versions
 app.get("/endpoints/versions", async (req, res) => {
+  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
+
   if (!ensureEvergreenBinding()) {
     return jsonResponse({ message: 'Server configuration error' }, 500)
   }
@@ -285,6 +364,10 @@ app.get("/endpoints/versions", async (req, res) => {
 
 // Returns endpoints data for URLs used by Evergreen to download application installers with Save-EvergreenApp
 app.get("/endpoints/downloads", async (req, res) => {
+  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
+
   if (!ensureEvergreenBinding()) {
     return jsonResponse({ message: 'Server configuration error' }, 500)
   }
@@ -311,6 +394,10 @@ app.get("/endpoints/downloads", async (req, res) => {
 
 // Health check endpoint with cache diagnostics
 app.get("/health", async (req, res) => {
+  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
+
   try {
     const health = {
       status: 'ok',
@@ -394,6 +481,10 @@ app.get("/health", async (req, res) => {
 
 // Root endpoint
 app.get('/', async (req, res) => {
+  if (!validateUserAgent(getRequestUserAgent(req))) {
+    return userAgentRequiredResponse()
+  }
+
   console.log(`Root endpoint called!`);
   return jsonResponse({
     message: 'Evergreen API with hybrid caching',
