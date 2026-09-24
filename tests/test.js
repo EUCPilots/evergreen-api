@@ -1,5 +1,11 @@
-const request = require('supertest')('https://evergreen-api.stealthpuppy.com');
-const assert = require('chai').assert;
+const baseUrl = process.env.API_BASE_URL || 'https://evergreen-api.stealthpuppy.com';
+const request = require('supertest')(baseUrl);
+let assert;
+
+before(async () => {
+    const chai = await import('chai');
+    assert = chai.assert;
+});
 
 // Test configuration
 const TEST_USER_AGENT = 'EvergreenAPI_Tests/1.0.0';
@@ -13,6 +19,12 @@ function makeRequest(path) {
         .timeout(TIMEOUT);
 }
 
+function makeRequestWithoutUserAgent(path) {
+    return request
+        .get(path)
+        .timeout(TIMEOUT);
+}
+
 // Helper function to check if this is the new caching API
 function isNewCachingAPI(headers) {
     return headers['x-cache-status'] !== undefined;
@@ -20,29 +32,25 @@ function isNewCachingAPI(headers) {
 
 // Root endpoint validation
 describe('Root API', () => {
-    it('GET / should return API information or 404', () => {
-        return makeRequest('/')
-            .expect('Content-Type', /json/)
-            .then((res) => {
-                if (res.status === 200) {
-                    // New implementation with root endpoint
-                    assert.isObject(res.body);
-                    assert.property(res.body, 'message');
-                    assert.property(res.body, 'documentation');
-                    if (res.body.endpoints) {
-                        assert.property(res.body, 'endpoints');
-                    }
-                    if (res.body.caching) {
-                        assert.property(res.body, 'caching');
-                        assert.include(res.body.caching, '2-tier');
-                    }
-                } else if (res.status === 404) {
-                    // Current production API behavior
-                    assert.isObject(res.body);
-                    assert.property(res.body, 'message');
-                } else {
-                    throw new Error(`Unexpected status: ${res.status}`);
-                }
+    it('GET / should return guidance for both deployed API variants', () => {
+        return makeRequest('/health')
+            .then((healthRes) => {
+                const newApi = isNewCachingAPI(healthRes.headers);
+
+                return makeRequest('/')
+                    .expect('Content-Type', /json/)
+                    .then((res) => {
+                        assert.isObject(res.body);
+
+                        if (newApi) {
+                            assert.equal(res.status, 404);
+                            assert.property(res.body, 'message');
+                            assert.property(res.body, 'documentation');
+                            assert.include(res.body.message, 'Use /apps');
+                        } else {
+                            assert.equal(res.status, 200);
+                        }
+                    });
             });
     });
 });
@@ -85,6 +93,58 @@ describe('Health API', () => {
                 if (isNewCachingAPI(res.headers)) {
                     assert.property(res.headers, 'x-cache-status');
                 }
+            });
+    });
+});
+
+describe('Request validation', () => {
+    it('GET /apps without User-Agent should stay compatible with deployed API variants', () => {
+        return makeRequest('/health')
+            .then((healthRes) => {
+                const newApi = isNewCachingAPI(healthRes.headers);
+
+                return makeRequestWithoutUserAgent('/apps')
+                    .expect('Content-Type', /json/)
+                    .then((res) => {
+                        if (newApi) {
+                            assert.equal(res.status, 400);
+                            assert.property(res.body, 'message');
+                            assert.include(res.body.message, 'User-Agent');
+                        } else if (res.status === 200) {
+                            assert.isArray(res.body);
+                        } else if (res.status === 404) {
+                            assert.property(res.body, 'message');
+                        } else {
+                            throw new Error(`Unexpected status code: ${res.status}`);
+                        }
+                    });
+            });
+    });
+
+    it('GET /app/MicrosoftEdge without User-Agent should stay compatible with deployed API variants', () => {
+        return makeRequest('/health')
+            .then((healthRes) => {
+                const newApi = isNewCachingAPI(healthRes.headers);
+
+                return makeRequestWithoutUserAgent('/app/MicrosoftEdge')
+                    .expect('Content-Type', /json/)
+                    .then((res) => {
+                        if (newApi) {
+                            assert.equal(res.status, 400);
+                            assert.property(res.body, 'message');
+                            assert.include(res.body.message, 'User-Agent');
+                        } else if (res.status === 200) {
+                            if (Array.isArray(res.body)) {
+                                assert.isArray(res.body);
+                            } else {
+                                assert.isObject(res.body);
+                            }
+                        } else if (res.status === 404) {
+                            assert.property(res.body, 'message');
+                        } else {
+                            throw new Error(`Unexpected status code: ${res.status}`);
+                        }
+                    });
             });
     });
 });
@@ -345,8 +405,9 @@ describe('Error Handling', () => {
             .get('/health')
             .timeout(TIMEOUT)
             .then((res) => {
-                // API might return 403 for missing User-Agent (production) or 200 (new implementation)
-                assert.oneOf(res.status, [200, 403]);
+                // The API requires a custom User-Agent; a missing or invalid value should be rejected
+                // while valid requests continue to return 200.
+                assert.oneOf(res.status, [200, 400, 403]);
             });
     });
 

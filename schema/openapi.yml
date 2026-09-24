@@ -71,7 +71,7 @@ paths:
             Examples: MicrosoftEdge, MozillaFirefox, GoogleChrome, etc.
           schema:
             type: string
-            pattern: '^[A-Za-z0-9-_]{1,64}$'
+            pattern: '^[A-Za-z0-9-_.]{1,64}$'
             example: MicrosoftEdge
       responses:
         '200':
@@ -81,7 +81,7 @@ paths:
               description: Caching policy for the response
               schema:
                 type: string
-                example: "public, max-age=300"
+                example: "public, max-age=43200"
           content:
             application/json:
               schema:
@@ -111,7 +111,7 @@ paths:
               description: Caching policy for the response
               schema:
                 type: string
-                example: "public, max-age=300"
+                example: "public, max-age=43200"
           content:
             application/json:
               schema:
@@ -178,7 +178,7 @@ paths:
               description: Caching policy for the response
               schema:
                 type: string
-                example: "public, max-age=300"
+                example: "public, max-age=43200"
           content:
             application/json:
               schema:
@@ -210,7 +210,7 @@ paths:
               description: Caching policy for the response
               schema:
                 type: string
-                example: "public, max-age=300"
+                example: "public, max-age=43200"
           content:
             application/json:
               schema:
