@@ -31,7 +31,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [24.x, 26.x]
       fail-fast: false
 
     steps:
@@ -86,7 +86,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Check JavaScript syntax
         run: |
@@ -222,7 +222,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Install test dependencies
         run: |
@@ -259,7 +259,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Install schema validation tools
         run: |
@@ -288,7 +288,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Install dependencies
         run: |
