@@ -27,7 +27,7 @@ No authentication is required for public endpoints.
 ### Rate Limiting
 
 The API includes caching headers to optimize performance:
-- Application data is cached for 5 minutes (`max-age=300`)
+- Application data is cached for 12 hours (`max-age=43200`)
 - Use conditional requests with caching headers when possible
 
 ### Example Usage
