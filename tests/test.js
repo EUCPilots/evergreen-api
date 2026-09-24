@@ -1,4 +1,5 @@
-const request = require('supertest')('https://evergreen-api.stealthpuppy.com');
+const baseUrl = process.env.API_BASE_URL || 'https://evergreen-api.stealthpuppy.com';
+const request = require('supertest')(baseUrl);
 const assert = require('chai').assert;
 
 // Test configuration
@@ -10,6 +11,12 @@ function makeRequest(path) {
     return request
         .get(path)
         .set('User-Agent', TEST_USER_AGENT)
+        .timeout(TIMEOUT);
+}
+
+function makeRequestWithoutUserAgent(path) {
+    return request
+        .get(path)
         .timeout(TIMEOUT);
 }
 
@@ -85,6 +92,28 @@ describe('Health API', () => {
                 if (isNewCachingAPI(res.headers)) {
                     assert.property(res.headers, 'x-cache-status');
                 }
+            });
+    });
+});
+
+describe('Request validation', () => {
+    it('GET /apps without User-Agent should return 400', () => {
+        return makeRequestWithoutUserAgent('/apps')
+            .expect('Content-Type', /json/)
+            .expect(400)
+            .then((res) => {
+                assert.property(res.body, 'message');
+                assert.include(res.body.message, 'User-Agent');
+            });
+    });
+
+    it('GET /app/MicrosoftEdge without User-Agent should return 400', () => {
+        return makeRequestWithoutUserAgent('/app/MicrosoftEdge')
+            .expect('Content-Type', /json/)
+            .expect(400)
+            .then((res) => {
+                assert.property(res.body, 'message');
+                assert.include(res.body.message, 'User-Agent');
             });
     });
 });
@@ -345,8 +374,9 @@ describe('Error Handling', () => {
             .get('/health')
             .timeout(TIMEOUT)
             .then((res) => {
-                // API might return 403 for missing User-Agent (production) or 200 (new implementation)
-                assert.oneOf(res.status, [200, 403]);
+                // The API requires a custom User-Agent; a missing or invalid value should be rejected
+                // while valid requests continue to return 200.
+                assert.oneOf(res.status, [200, 400, 403]);
             });
     });
 
