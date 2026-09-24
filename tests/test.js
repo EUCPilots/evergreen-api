@@ -27,29 +27,15 @@ function isNewCachingAPI(headers) {
 
 // Root endpoint validation
 describe('Root API', () => {
-    it('GET / should return API information or 404', () => {
+    it('GET / should return 404 with guidance', () => {
         return makeRequest('/')
             .expect('Content-Type', /json/)
+            .expect(404)
             .then((res) => {
-                if (res.status === 200) {
-                    // New implementation with root endpoint
-                    assert.isObject(res.body);
-                    assert.property(res.body, 'message');
-                    assert.property(res.body, 'documentation');
-                    if (res.body.endpoints) {
-                        assert.property(res.body, 'endpoints');
-                    }
-                    if (res.body.caching) {
-                        assert.property(res.body, 'caching');
-                        assert.include(res.body.caching, '2-tier');
-                    }
-                } else if (res.status === 404) {
-                    // Current production API behavior
-                    assert.isObject(res.body);
-                    assert.property(res.body, 'message');
-                } else {
-                    throw new Error(`Unexpected status: ${res.status}`);
-                }
+                assert.isObject(res.body);
+                assert.property(res.body, 'message');
+                assert.property(res.body, 'documentation');
+                assert.include(res.body.message, 'Use /apps');
             });
     });
 });

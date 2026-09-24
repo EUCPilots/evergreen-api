@@ -484,11 +484,9 @@ app.get('/', async (req, res) => {
 
   console.log(`Root endpoint called!`);
   return jsonResponse({
-    message: 'Evergreen API with hybrid caching',
-    documentation: 'https://eucpilots.com/evergreen/api/',
-    endpoints: ['/apps', '/app/{appId}', '/endpoints/versions', '/endpoints/downloads', '/health'],
-    caching: '2-tier: Memory + KV (12h TTL)'
-  })
+    message: 'Endpoint not found. Use /apps, /app/{appId}, /endpoints/versions, /endpoints/downloads, or /health.',
+    documentation: 'https://eucpilots.com/evergreen/api/'
+  }, 404)
 });
 
 // Event listener with R2 logging
