@@ -36,7 +36,7 @@ function validateUserAgent(userAgent) {
   const trimmedUserAgent = userAgent.trim()
   if (trimmedUserAgent.length < 3 || trimmedUserAgent.length > 100) return false
 
-  if (!/^[A-Za-z0-9][A-Za-z0-9\-._/\s]*[A-Za-z0-9]$/.test(trimmedUserAgent)) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9\-._/:;(),\s]*[A-Za-z0-9)]$/.test(trimmedUserAgent)) {
     return false
   }
 
