@@ -109,6 +109,14 @@ function ensureLogsBucketBinding() {
   return true
 }
 
+function ensureAnalyticsBinding() {
+  if (typeof REQUEST_ANALYTICS === 'undefined') {
+    console.error('REQUEST_ANALYTICS Analytics Engine binding is not available')
+    return false
+  }
+  return true
+}
+
 // === MEMORY + KV CACHING (SIMPLIFIED) ===
 
 // In-memory cache functions
@@ -225,6 +233,28 @@ async function storeLogToR2(request, startTime) {
     console.log(`Log stored to R2: ${logKey}`)
   } catch (error) {
     console.error('Failed to store log to R2:', error)
+  }
+}
+
+// Analytics Engine logging - only called for successful (2xx) GET requests to real endpoints
+async function logToAnalyticsEngine(request) {
+  if (!ensureAnalyticsBinding()) {
+    return
+  }
+
+  try {
+    const path = new URL(request.url).pathname
+    const country = request.cf?.country || ''
+    const region = request.cf?.region || ''
+    const city = request.cf?.city || ''
+    const userAgent = request.headers.get('user-agent') || ''
+
+    REQUEST_ANALYTICS.writeDataPoint({
+      indexes: [path],
+      blobs: [path, country, region, city, userAgent]
+    })
+  } catch (error) {
+    console.error('Failed to write Analytics Engine data point:', error)
   }
 }
 
@@ -489,32 +519,43 @@ app.get('/', async (req, res) => {
   }, 404)
 });
 
-// Event listener with R2 logging
-addEventListener('fetch', event => {
-  const startTime = Date.now()
-  const url = new URL(event.request.url)
-  const path = url.pathname
-  
-  console.log('Event received:', event.request.method, event.request.url)
-  
-  // Determine if this request should be logged to R2
-  // Only log requests to main API endpoints, exclude health checks and invalid paths
-  // Define exact match endpoints and prefix match endpoints separately
-  const exactEndpoints = ['/apps', '/app', '/endpoints/versions', '/endpoints/downloads'];
-  const prefixEndpoints = ['/app/', '/apps/', '/endpoints/versions/', '/endpoints/downloads/'];
-  const shouldLog = (
-    exactEndpoints.includes(path) ||
-    prefixEndpoints.some(endpoint => path.startsWith(endpoint))
-  ) && path !== '/health';
-  
-  event.respondWith(
-    app.handleRequest(event.request).then(response => {
-      // Store log to R2 asynchronously (don't await to avoid delaying response)
-      // Only log if it's a valid endpoint
-      if (shouldLog) {
-        event.waitUntil(storeLogToR2(event.request, startTime))
-      }
-      return response
-    })
-  )
-})
+// Module worker entrypoint (module format is required for the Analytics Engine binding)
+export default {
+  async fetch(request, env, ctx) {
+    // Expose bindings as globals so the rest of this file's typeof-based checks keep working
+    globalThis.EVERGREEN = env.EVERGREEN
+    globalThis.LOGS_BUCKET = env.LOGS_BUCKET
+    globalThis.REQUEST_ANALYTICS = env.REQUEST_ANALYTICS
+
+    const startTime = Date.now()
+    const url = new URL(request.url)
+    const path = url.pathname
+
+    console.log('Event received:', request.method, request.url)
+
+    // Determine if this request should be logged to R2
+    // Only log requests to main API endpoints, exclude health checks and invalid paths
+    // Define exact match endpoints and prefix match endpoints separately
+    const exactEndpoints = ['/apps', '/app', '/endpoints/versions', '/endpoints/downloads'];
+    const prefixEndpoints = ['/app/', '/apps/', '/endpoints/versions/', '/endpoints/downloads/'];
+    const shouldLog = (
+      exactEndpoints.includes(path) ||
+      prefixEndpoints.some(endpoint => path.startsWith(endpoint))
+    ) && path !== '/health';
+
+    const response = await app.handleRequest(request)
+
+    // Store log to R2 asynchronously (don't await to avoid delaying response)
+    // Only log if it's a valid endpoint
+    if (shouldLog) {
+      ctx.waitUntil(storeLogToR2(request, startTime))
+    }
+
+    // Track successful GET requests in Analytics Engine
+    if (shouldLog && request.method === 'GET' && response.status >= 200 && response.status < 300) {
+      ctx.waitUntil(logToAnalyticsEngine(request))
+    }
+
+    return response
+  }
+}

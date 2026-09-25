@@ -17,6 +17,11 @@ kv_namespaces = [
 binding = "LOGS_BUCKET"
 bucket_name = "evergreen-api"
 
+# Analytics Engine binding for default (production) deployment
+[[analytics_engine_datasets]]
+binding = "REQUEST_ANALYTICS"
+dataset = "evergreen_requests"
+
 [env.production]
 name = "evergreen-api"
 vars = { ENVIRONMENT = "production" }
@@ -27,6 +32,10 @@ kv_namespaces = [
 [[env.production.r2_buckets]]
 binding = "LOGS_BUCKET"
 bucket_name = "evergreen-api"
+
+[[env.production.analytics_engine_datasets]]
+binding = "REQUEST_ANALYTICS"
+dataset = "evergreen_requests"
 
 [env.staging]
 name = "evergreen-api-staging"
@@ -39,3 +48,7 @@ kv_namespaces = [
 binding = "LOGS_BUCKET"
 bucket_name = "evergreen-api-staging"
 preview_bucket_name = "evergreen-api-test"
+
+[[env.staging.analytics_engine_datasets]]
+binding = "REQUEST_ANALYTICS"
+dataset = "evergreen_requests_staging"
