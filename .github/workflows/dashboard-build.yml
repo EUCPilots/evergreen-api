@@ -3,7 +3,9 @@ name: Dashboard Build & Deploy
 on:
   schedule:
     - cron: '0 */12 * * *'  # Every 12 hours
-
+  push:
+      paths:
+      - 'dashboard/**'
   workflow_dispatch:
 
 permissions:
