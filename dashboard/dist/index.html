@@ -37,13 +37,21 @@
     .section-heading { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin: 1.75rem 0 .6rem; }
     .section-heading h2 { font-size: 1.05rem; margin: 0; }
     .section-heading p { color: var(--muted); font-size: .82rem; margin: 0; }
+    .heading-text { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex: 1; }
+    .export { background: transparent; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: .75rem; font-weight: 700; letter-spacing: .04em; margin: 0; padding: .35rem .7rem; text-transform: uppercase; white-space: nowrap; width: auto; }
+    .export:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
     figure { border: 1px solid var(--line); border-radius: 6px; margin: 0; overflow: auto; }
-    table { font-size: .88rem; margin: 0; }
+    table { font-size: .88rem; margin: 0; table-layout: fixed; width: 100%; min-width: 34rem; }
     th { background: var(--surface); color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
-    td, th { padding: .65rem .8rem; }
+    td, th { padding: .65rem .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     tbody tr:hover { background: #f8faf8; }
     td.count, th.count { text-align: right; font-variant-numeric: tabular-nums; }
-    td.value { max-width: 38rem; overflow-wrap: anywhere; }
+    th button.sort { background: transparent; border: 0; color: inherit; font: inherit; letter-spacing: inherit; margin: 0; padding: 0; text-transform: inherit; width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    th.count button.sort { text-align: right; }
+    th button.sort:hover { color: var(--accent); }
+    th button.sort .arrow { opacity: 0; padding-left: .3rem; }
+    th[aria-sort] button.sort { color: var(--ink); }
+    th[aria-sort] button.sort .arrow { opacity: 1; }
     .meter { background: var(--line); display: inline-block; height: 4px; margin-right: .45rem; vertical-align: middle; width: 4rem; }
     .meter > span { background: var(--accent); display: block; height: 100%; }
     .notice { background: var(--warning-soft); border-left: 3px solid var(--warning); color: #6f3217; padding: .8rem 1rem; margin-bottom: 1rem; }
@@ -86,25 +94,25 @@
     </div>
 
     <section id="traffic-panel" role="tabpanel" aria-labelledby="traffic-tab">
-      <div class="section-heading"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div>
-      <figure><table><thead><tr><th>Path</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="paths"></tbody></table></figure>
-      <div class="section-heading"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div>
-      <figure><table><thead><tr><th>Connecting IP</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="connecting-ips"></tbody></table></figure>
+      <div class="section-heading" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
+      <figure data-table="paths"></figure>
+      <div class="section-heading" data-table="connectingIps"><div class="heading-text"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div></div>
+      <figure data-table="connectingIps"></figure>
     </section>
 
     <section id="audience-panel" role="tabpanel" aria-labelledby="audience-tab" hidden>
-      <div class="section-heading"><h2>Country and region</h2><p>Where API traffic originates</p></div>
-      <figure><table><thead><tr><th>Country</th><th>Region</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="locations"></tbody></table></figure>
-      <div class="section-heading"><h2>Network organizations</h2><p>ISP or company reported by the connecting network</p></div>
-      <figure><table><thead><tr><th>AS organization</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="organizations"></tbody></table></figure>
-      <div class="section-heading"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div>
-      <figure><table><thead><tr><th>User agent</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="user-agents"></tbody></table></figure>
+      <div class="section-heading" data-table="locations"><div class="heading-text"><h2>Country and region</h2><p>Where API traffic originates</p></div></div>
+      <figure data-table="locations"></figure>
+      <div class="section-heading" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>ISP or company reported by the connecting network</p></div></div>
+      <figure data-table="organizations"></figure>
+      <div class="section-heading" data-table="userAgents"><div class="heading-text"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div></div>
+      <figure data-table="userAgents"></figure>
     </section>
 
     <section id="abuse-panel" role="tabpanel" aria-labelledby="abuse-tab" hidden>
       <div id="burst-notice" class="notice">Loading detection criteria&hellip;</div>
-      <div class="section-heading"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div>
-      <figure><table><thead><tr><th>Window (UTC)</th><th>Connecting IP</th><th>Path</th><th>Organization</th><th>User agent</th><th class="count">Requests</th></tr></thead><tbody id="bursts"></tbody></table></figure>
+      <div class="section-heading" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
+      <figure data-table="bursts"></figure>
     </section>
   </main>
   <script src="app.js"></script>
