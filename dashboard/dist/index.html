@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Evergreen API — Request Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <style>
+    th[data-key] { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sorted::after { content: ' \25BC'; }
+    th.sorted.asc::after { content: ' \25B2'; }
+    td.count, th.count { text-align: right; font-variant-numeric: tabular-nums; }
+    #meta { color: var(--pico-muted-color); margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <hgroup>
+      <h1>Evergreen API — Request Dashboard</h1>
+      <p id="meta">Loading&hellip;</p>
+    </hgroup>
+    <input type="search" id="filter" placeholder="Filter by path, country, region, city, or user-agent&hellip;" />
+    <figure>
+      <table role="grid">
+        <thead>
+          <tr>
+            <th data-key="path">Path</th>
+            <th data-key="country">Country</th>
+            <th data-key="region">Region</th>
+            <th data-key="city">City</th>
+            <th data-key="userAgent">User-Agent</th>
+            <th data-key="count" class="count sorted">Count</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </figure>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
+
