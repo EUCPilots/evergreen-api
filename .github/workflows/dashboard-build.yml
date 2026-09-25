@@ -1,0 +1,38 @@
+name: Dashboard Build & Deploy
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'  # Every 12 hours
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: Build dashboard and deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build dashboard data
+        working-directory: dashboard
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_EVERGREENDASHBOARD_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_DATASET: evergreen_requests
+        run: node build.mjs
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_EVERGREENDASHBOARD_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: npx wrangler pages deploy dashboard/dist --project-name=evergreen-dashboard
