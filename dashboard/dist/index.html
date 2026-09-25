@@ -3,42 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Evergreen API — Request Dashboard</title>
+  <title>Evergreen API | Request intelligence</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
   <style>
-    table { font-size: 16px; }
-    tbody tr { transition: background-color 0.15s ease, box-shadow 0.15s ease; }
-    tbody tr:hover { background-color: rgba(0, 123, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(0, 123, 255, 0.12); }
-    th[data-key] { cursor: pointer; user-select: none; white-space: nowrap; }
-    th.sorted::after { content: ' \25BC'; }
-    th.sorted.asc::after { content: ' \25B2'; }
+    :root {
+      --ink: #17211b;
+      --muted: #637168;
+      --line: #dce3de;
+      --surface: #f5f7f5;
+      --accent: #087f5b;
+      --accent-soft: #dff3eb;
+      --warning: #a44318;
+      --warning-soft: #fff0e8;
+    }
+    body { color: var(--ink); background: #fff; }
+    main.container { padding-top: 2rem; padding-bottom: 4rem; }
+    .masthead { display: flex; align-items: end; justify-content: space-between; gap: 2rem; border-bottom: 1px solid var(--line); padding-bottom: 1.25rem; }
+    .eyebrow { color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .25rem; }
+    h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); margin: 0; letter-spacing: 0; }
+    #meta { color: var(--muted); margin: .35rem 0 0; }
+    .status { color: var(--accent); background: var(--accent-soft); border-radius: 4px; font-size: .8rem; font-weight: 700; padding: .35rem .6rem; white-space: nowrap; }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 1.5rem 0; }
+    .stat { background: #fff; padding: 1rem 1.2rem; }
+    .stat span { color: var(--muted); display: block; font-size: .78rem; font-weight: 700; text-transform: uppercase; }
+    .stat strong { display: block; font-size: 1.75rem; font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: .25rem; }
+    .controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+    .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; padding: 3px; }
+    .tabs button { background: transparent; border: 0; border-radius: 4px; color: var(--muted); font-size: .9rem; margin: 0; padding: .45rem .8rem; }
+    .tabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
+    #filter { max-width: 25rem; margin: 0; }
+    [role="tabpanel"][hidden] { display: none; }
+    .section-heading { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin: 1.75rem 0 .6rem; }
+    .section-heading h2 { font-size: 1.05rem; margin: 0; }
+    .section-heading p { color: var(--muted); font-size: .82rem; margin: 0; }
+    figure { border: 1px solid var(--line); border-radius: 6px; margin: 0; overflow: auto; }
+    table { font-size: .88rem; margin: 0; }
+    th { background: var(--surface); color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+    td, th { padding: .65rem .8rem; }
+    tbody tr:hover { background: #f8faf8; }
     td.count, th.count { text-align: right; font-variant-numeric: tabular-nums; }
-    #meta { color: var(--pico-muted-color); margin-bottom: 1rem; }
+    td.value { max-width: 38rem; overflow-wrap: anywhere; }
+    .meter { background: var(--line); display: inline-block; height: 4px; margin-right: .45rem; vertical-align: middle; width: 4rem; }
+    .meter > span { background: var(--accent); display: block; height: 100%; }
+    .notice { background: var(--warning-soft); border-left: 3px solid var(--warning); color: #6f3217; padding: .8rem 1rem; margin-bottom: 1rem; }
+    .notice strong { color: inherit; }
+    .empty { color: var(--muted); padding: 2rem; text-align: center; }
+    @media (max-width: 700px) {
+      main.container { padding-top: 1rem; }
+      .masthead, .controls { align-items: stretch; flex-direction: column; }
+      .stats { grid-template-columns: 1fr; }
+      .tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
+      #filter { max-width: none; }
+      .section-heading { align-items: start; flex-direction: column; }
+    }
   </style>
 </head>
 <body>
   <main class="container">
-    <hgroup>
-      <h1>Evergreen API — Request Dashboard</h1>
-      <p id="meta">Loading&hellip;</p>
-    </hgroup>
-    <input type="search" id="filter" placeholder="Filter by path, country, region, city, or user-agent&hellip;" />
-    <figure>
-      <table role="grid">
-        <thead>
-          <tr>
-            <th data-key="path">Path</th>
-            <th data-key="country">Country</th>
-            <th data-key="region">Region</th>
-            <th data-key="city">City</th>
-            <th data-key="userAgent">User-Agent</th>
-            <th data-key="count" class="count sorted">Count</th>
-            <th data-key="uniqueRequests" class="count">Unique Requests</th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </figure>
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">Evergreen API</p>
+        <h1>Request intelligence</h1>
+        <p id="meta">Loading request data&hellip;</p>
+      </div>
+      <span class="status">Successful GET requests</span>
+    </header>
+
+    <section class="stats" aria-label="Request summary">
+      <div class="stat"><span>Total requests</span><strong id="total-requests">&mdash;</strong></div>
+      <div class="stat"><span>Connecting IPs</span><strong id="unique-ips">&mdash;</strong></div>
+      <div class="stat"><span>Flagged bursts</span><strong id="burst-count">&mdash;</strong></div>
+    </section>
+
+    <div class="controls">
+      <div class="tabs" role="tablist" aria-label="Dashboard views">
+        <button type="button" role="tab" aria-selected="true" aria-controls="traffic-panel" id="traffic-tab">Traffic</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="audience-panel" id="audience-tab">Audience</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="abuse-panel" id="abuse-tab">Potential abuse</button>
+      </div>
+      <input type="search" id="filter" aria-label="Filter the current view" placeholder="Filter current view&hellip;" />
+    </div>
+
+    <section id="traffic-panel" role="tabpanel" aria-labelledby="traffic-tab">
+      <div class="section-heading"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div>
+      <figure><table><thead><tr><th>Path</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="paths"></tbody></table></figure>
+      <div class="section-heading"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div>
+      <figure><table><thead><tr><th>Connecting IP</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="connecting-ips"></tbody></table></figure>
+    </section>
+
+    <section id="audience-panel" role="tabpanel" aria-labelledby="audience-tab" hidden>
+      <div class="section-heading"><h2>Country and region</h2><p>Where API traffic originates</p></div>
+      <figure><table><thead><tr><th>Country</th><th>Region</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="locations"></tbody></table></figure>
+      <div class="section-heading"><h2>Network organizations</h2><p>ISP or company reported by the connecting network</p></div>
+      <figure><table><thead><tr><th>AS organization</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="organizations"></tbody></table></figure>
+      <div class="section-heading"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div>
+      <figure><table><thead><tr><th>User agent</th><th class="count">Share</th><th class="count">Requests</th></tr></thead><tbody id="user-agents"></tbody></table></figure>
+    </section>
+
+    <section id="abuse-panel" role="tabpanel" aria-labelledby="abuse-tab" hidden>
+      <div id="burst-notice" class="notice">Loading detection criteria&hellip;</div>
+      <div class="section-heading"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div>
+      <figure><table><thead><tr><th>Window (UTC)</th><th>Connecting IP</th><th>Path</th><th>Organization</th><th>User agent</th><th class="count">Requests</th></tr></thead><tbody id="bursts"></tbody></table></figure>
+    </section>
   </main>
   <script src="app.js"></script>
 </body>

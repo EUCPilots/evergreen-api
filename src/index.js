@@ -248,12 +248,12 @@ async function logToAnalyticsEngine(request) {
     const region = request.cf?.region || ''
     const city = request.cf?.city || ''
     const userAgent = request.headers.get('user-agent') || ''
-    // x-real-ip lets the dashboard approximate unique requests/visitors per group
-    const realIp = request.headers.get('x-real-ip') || ''
+    const connectingIp = request.headers.get('cf-connecting-ip') || ''
+    const asOrganization = request.cf?.asOrganization || ''
 
     REQUEST_ANALYTICS.writeDataPoint({
       indexes: [path],
-      blobs: [path, country, region, city, userAgent, realIp]
+      blobs: [path, country, region, city, userAgent, connectingIp, asOrganization]
     })
   } catch (error) {
     console.error('Failed to write Analytics Engine data point:', error)

@@ -1,9 +1,11 @@
 const state = {
-  rows: [],
-  sortKey: 'count',
-  sortDir: 'desc',
+  data: null,
+  activePanel: 'traffic-panel',
   filter: ''
 }
+
+const numberFormat = new Intl.NumberFormat()
+const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 })
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -11,73 +13,72 @@ function escapeHtml(value) {
   }[char]))
 }
 
-function applyFilter(rows, filter) {
+function applyFilter(rows) {
+  const filter = state.filter
   if (!filter) return rows
   const needle = filter.toLowerCase()
-  return rows.filter(row =>
-    ['path', 'country', 'region', 'city', 'userAgent'].some(key =>
-      String(row[key] ?? '').toLowerCase().includes(needle)
-    )
-  )
+  return rows.filter(row => Object.values(row).some(value => String(value ?? '').toLowerCase().includes(needle)))
 }
 
-function sortRows(rows, key, dir) {
-  const sorted = [...rows].sort((a, b) => {
-    const av = a[key]
-    const bv = b[key]
-    if (typeof av === 'number' && typeof bv === 'number') return av - bv
-    return String(av ?? '').localeCompare(String(bv ?? ''))
-  })
-  return dir === 'desc' ? sorted.reverse() : sorted
+function shareCell(count, total) {
+  const share = total ? Number(count) / total : 0
+  return `<td class="count"><span class="meter"><span style="width:${Math.min(share * 100, 100)}%"></span></span>${percentFormat.format(share)}</td>`
+}
+
+function renderRows(id, rows, renderRow, columnCount) {
+  const filtered = applyFilter(rows)
+  document.getElementById(id).innerHTML = filtered.length
+    ? filtered.map(renderRow).join('')
+    : `<tr><td colspan="${columnCount}" class="empty">No matching data</td></tr>`
 }
 
 function render() {
-  const filtered = applyFilter(state.rows, state.filter)
-  const sorted = sortRows(filtered, state.sortKey, state.sortDir)
+  const data = state.data
+  const total = Number(data.summary.totalRequests) || 0
 
-  document.getElementById('rows').innerHTML = sorted.map(row => `
-    <tr>
-      <td>${escapeHtml(row.path)}</td>
-      <td>${escapeHtml(row.country)}</td>
-      <td>${escapeHtml(row.region)}</td>
-      <td>${escapeHtml(row.city)}</td>
-      <td>${escapeHtml(row.userAgent)}</td>
-      <td class="count">${escapeHtml(row.count)}</td>
-      <td class="count">${escapeHtml(row.uniqueRequests)}</td>
-    </tr>
-  `).join('')
-
-  document.querySelectorAll('th[data-key]').forEach(th => {
-    th.classList.toggle('sorted', th.dataset.key === state.sortKey)
-    th.classList.toggle('asc', th.dataset.key === state.sortKey && state.sortDir === 'asc')
-  })
+  renderRows('paths', data.paths, row => `<tr><td class="value">${escapeHtml(row.path)}</td>${shareCell(row.count, total)}<td class="count">${numberFormat.format(row.count)}</td></tr>`, 3)
+  renderRows('connecting-ips', data.connectingIps, row => `<tr><td class="value">${escapeHtml(row.connectingIp)}</td>${shareCell(row.count, total)}<td class="count">${numberFormat.format(row.count)}</td></tr>`, 3)
+  renderRows('locations', data.locations, row => `<tr><td>${escapeHtml(row.country || 'Unknown')}</td><td class="value">${escapeHtml(row.region || 'Unknown')}</td>${shareCell(row.count, total)}<td class="count">${numberFormat.format(row.count)}</td></tr>`, 4)
+  renderRows('organizations', data.organizations, row => `<tr><td class="value">${escapeHtml(row.asOrganization)}</td>${shareCell(row.count, total)}<td class="count">${numberFormat.format(row.count)}</td></tr>`, 3)
+  renderRows('user-agents', data.userAgents, row => `<tr><td class="value">${escapeHtml(row.userAgent)}</td>${shareCell(row.count, total)}<td class="count">${numberFormat.format(row.count)}</td></tr>`, 3)
+  renderRows('bursts', data.bursts, row => `<tr><td>${escapeHtml(new Date(`${row.windowStart}Z`).toLocaleString())}</td><td>${escapeHtml(row.connectingIp)}</td><td class="value">${escapeHtml(row.path)}</td><td class="value">${escapeHtml(row.asOrganization || 'Unknown')}</td><td class="value">${escapeHtml(row.userAgent)}</td><td class="count">${numberFormat.format(row.count)}</td></tr>`, 6)
 }
 
 async function init() {
   const res = await fetch('data.json', { cache: 'no-store' })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()
-  state.rows = data.rows || []
+  state.data = data
+
+  const total = Number(data.summary?.totalRequests) || 0
+  document.getElementById('total-requests').textContent = numberFormat.format(total)
+  document.getElementById('unique-ips').textContent = numberFormat.format(data.summary?.uniqueConnectingIps || 0)
+  document.getElementById('burst-count').textContent = numberFormat.format(data.bursts?.length || 0)
 
   document.getElementById('meta').textContent =
-    `Generated ${new Date(data.generatedAt).toLocaleString()} · last ${data.lookbackDays} days · ${state.rows.length} unique combinations`
+    `Last ${data.lookbackDays} days · updated ${new Date(data.generatedAt).toLocaleString()}`
+  document.getElementById('burst-notice').innerHTML =
+    `<strong>Review signal:</strong> ${numberFormat.format(data.burstRequestThreshold)} or more requests from the same IP to the same path with the same user agent within ${numberFormat.format(data.burstWindowMinutes)} minutes. A flagged window is an indicator for investigation, not proof of abuse.`
 
   document.getElementById('filter').addEventListener('input', event => {
     state.filter = event.target.value
     render()
   })
 
-  document.querySelectorAll('th[data-key]').forEach(th => {
-    th.addEventListener('click', () => {
-      if (state.sortKey === th.dataset.key) {
-        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc'
-      } else {
-        state.sortKey = th.dataset.key
-        state.sortDir = 'desc'
-      }
-      render()
+  document.querySelectorAll('[role="tab"]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      state.activePanel = tab.getAttribute('aria-controls')
+      document.querySelectorAll('[role="tab"]').forEach(item => item.setAttribute('aria-selected', String(item === tab)))
+      document.querySelectorAll('[role="tabpanel"]').forEach(panel => { panel.hidden = panel.id !== state.activePanel })
     })
   })
 
+  data.paths ||= []
+  data.connectingIps ||= []
+  data.locations ||= []
+  data.organizations ||= []
+  data.userAgents ||= []
+  data.bursts ||= []
   render()
 }
 
