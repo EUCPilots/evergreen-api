@@ -34,7 +34,12 @@
     .tabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
     #filter { max-width: 25rem; margin: 0; }
     [role="tabpanel"][hidden] { display: none; }
-    .section-heading { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin: 1.75rem 0 .6rem; }
+    .section-heading { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin: 1.75rem 0 .6rem; scroll-margin-top: 1rem; }
+    .jump-links { border: 1px solid var(--line); border-radius: 6px; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin-bottom: 1rem; padding: .6rem .8rem; }
+    .jump-links span { color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .jump-links a { font-size: .82rem; }
+    .back-to-top { display: block; font-size: .82rem; margin: .5rem 0 0; text-align: right; }
+    .page-foot { border-top: 1px solid var(--line); margin-top: 2.5rem; padding-top: 1rem; text-align: center; }
     .section-heading h2 { font-size: 1.05rem; margin: 0; }
     .section-heading p { color: var(--muted); font-size: .82rem; margin: 0; }
     .heading-text { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex: 1; }
@@ -68,7 +73,7 @@
   </style>
 </head>
 <body>
-  <main class="container">
+  <main class="container" id="top">
     <header class="masthead">
       <div>
         <p class="eyebrow">Evergreen API</p>
@@ -94,26 +99,49 @@
     </div>
 
     <section id="traffic-panel" role="tabpanel" aria-labelledby="traffic-tab">
-      <div class="section-heading" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
+      <nav class="jump-links" aria-label="Jump to a table in this view">
+        <span>Jump to</span>
+        <a href="#table-paths">Requests by path</a>
+        <a href="#table-connectingIps">Requests by connecting IP</a>
+      </nav>
+      <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
       <figure data-table="paths"></figure>
-      <div class="section-heading" data-table="connectingIps"><div class="heading-text"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div></div>
+      <a class="back-to-top" href="#top">Back to top &uarr;</a>
+      <div class="section-heading" id="table-connectingIps" data-table="connectingIps"><div class="heading-text"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div></div>
       <figure data-table="connectingIps"></figure>
+      <a class="back-to-top" href="#top">Back to top &uarr;</a>
     </section>
 
     <section id="audience-panel" role="tabpanel" aria-labelledby="audience-tab" hidden>
-      <div class="section-heading" data-table="locations"><div class="heading-text"><h2>Country and region</h2><p>Where API traffic originates</p></div></div>
+      <nav class="jump-links" aria-label="Jump to a table in this view">
+        <span>Jump to</span>
+        <a href="#table-locations">Country and region</a>
+        <a href="#table-userAgents">User agents</a>
+        <a href="#table-organizations">Network organizations</a>
+      </nav>
+      <div class="section-heading" id="table-locations" data-table="locations"><div class="heading-text"><h2>Country and region</h2><p>Where API traffic originates</p></div></div>
       <figure data-table="locations"></figure>
-      <div class="section-heading" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>ISP or company reported by the connecting network</p></div></div>
-      <figure data-table="organizations"></figure>
-      <div class="section-heading" data-table="userAgents"><div class="heading-text"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div></div>
+      <a class="back-to-top" href="#top">Back to top &uarr;</a>
+      <div class="section-heading" id="table-userAgents" data-table="userAgents"><div class="heading-text"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div></div>
       <figure data-table="userAgents"></figure>
+      <a class="back-to-top" href="#top">Back to top &uarr;</a>
+      <div class="section-heading" id="table-organizations" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>ISP or company reported by the connecting network</p></div></div>
+      <figure data-table="organizations"></figure>
+      <a class="back-to-top" href="#top">Back to top &uarr;</a>
     </section>
 
     <section id="abuse-panel" role="tabpanel" aria-labelledby="abuse-tab" hidden>
       <div id="burst-notice" class="notice">Loading detection criteria&hellip;</div>
-      <div class="section-heading" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
+      <nav class="jump-links" aria-label="Jump to a table in this view">
+        <span>Jump to</span>
+        <a href="#table-bursts">High-volume request windows</a>
+      </nav>
+      <div class="section-heading" id="table-bursts" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
       <figure data-table="bursts"></figure>
+      <a class="back-to-top" href="#top">Back to top &uarr;</a>
     </section>
+
+    <footer class="page-foot"><a href="#top">Back to top &uarr;</a></footer>
   </main>
   <script src="app.js"></script>
 </body>
