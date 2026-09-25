@@ -11,7 +11,7 @@ if (!CF_API_TOKEN || !CF_ACCOUNT_ID) {
 
 const SQL_API_URL = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`
 
-// blob1=path, blob2=country, blob3=region, blob4=city, blob5=userAgent (see src/index.js logToAnalyticsEngine)
+// blob1=path, blob2=country, blob3=region, blob4=city, blob5=userAgent, blob6=realIp (see src/index.js logToAnalyticsEngine)
 const query = `
 SELECT
   blob1 AS path,
@@ -19,7 +19,8 @@ SELECT
   blob3 AS region,
   blob4 AS city,
   blob5 AS userAgent,
-  SUM(_sample_interval) AS count
+  SUM(_sample_interval) AS count,
+  COUNT(DISTINCT blob6) AS uniqueRequests
 FROM ${CF_DATASET}
 WHERE timestamp > NOW() - INTERVAL '${LOOKBACK_DAYS}' DAY
 GROUP BY blob1, blob2, blob3, blob4, blob5

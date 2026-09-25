@@ -43,6 +43,7 @@ function render() {
       <td>${escapeHtml(row.city)}</td>
       <td>${escapeHtml(row.userAgent)}</td>
       <td class="count">${escapeHtml(row.count)}</td>
+      <td class="count">${escapeHtml(row.uniqueRequests)}</td>
     </tr>
   `).join('')
 
