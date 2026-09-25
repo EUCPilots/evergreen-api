@@ -1,0 +1,10 @@
+{
+  "name": "evergreen-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build script that queries Workers Analytics Engine and generates the static request dashboard.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}
