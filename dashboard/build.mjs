@@ -42,6 +42,21 @@ ORDER BY count DESC
 LIMIT 500`
 }
 
+function sqlStringLiteral(value) {
+  return `'${String(value).replace(/'/g, "''")}'`
+}
+
+// Analytics Engine SQL doesn't support subqueries, so this is built from connectingIps results at runtime
+function organizationsQuery(connectingIps) {
+  const inList = connectingIps.map(sqlStringLiteral).join(', ')
+  return `SELECT blob7 AS asOrganization, SUM(_sample_interval) AS count
+${recentData} AND blob7 != ''
+  AND blob6 IN (${inList})
+GROUP BY blob7
+ORDER BY count DESC
+LIMIT 500`
+}
+
 const queries = {
   summary: `SELECT
   SUM(_sample_interval) AS totalRequests,
@@ -57,18 +72,6 @@ LIMIT 500`,
   locations: `SELECT blob2 AS country, blob3 AS region, SUM(_sample_interval) AS count
 ${recentData} AND (blob2 != '' OR blob3 != '')
 GROUP BY blob2, blob3
-ORDER BY count DESC
-LIMIT 500`,
-  organizations: `SELECT blob7 AS asOrganization, SUM(_sample_interval) AS count
-${recentData} AND blob7 != ''
-  AND blob6 IN (
-    SELECT blob6
-    FROM ${CF_DATASET}
-    WHERE timestamp > NOW() - INTERVAL '${lookbackDays}' DAY AND blob6 != ''
-    GROUP BY blob6
-    HAVING SUM(_sample_interval) > 1
-  )
-GROUP BY blob7
 ORDER BY count DESC
 LIMIT 500`,
   userAgents: dimensionQuery('blob5', 'userAgent'),
@@ -116,6 +119,11 @@ async function main() {
   }))
   const data = Object.fromEntries(entries)
   const summary = data.summary[0] || { totalRequests: 0, uniqueConnectingIps: 0 }
+
+  const repeatIps = data.connectingIps.map(row => row.connectingIp)
+  data.organizations = repeatIps.length > 0
+    ? (await runQuery(organizationsQuery(repeatIps))).data || []
+    : []
 
   const output = {
     generatedAt: new Date().toISOString(),
