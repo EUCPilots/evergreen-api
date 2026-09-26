@@ -60,6 +60,41 @@ const TABLES = {
       { key: 'userAgent', label: 'User agent' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
+  },
+  trend: {
+    file: 'daily-traffic-trend',
+    columns: [
+      { key: 'day', label: 'Day', type: 'date', width: '10rem' },
+      { key: 'count', label: 'Requests', type: 'count' },
+      { key: 'uniqueConnectingIps', label: 'Unique IPs', type: 'count' }
+    ]
+  },
+  clientFamilies: {
+    file: 'client-families',
+    columns: [
+      { key: 'family', label: 'Client family' },
+      { key: 'variants', label: 'Variants', type: 'count', width: '9rem' },
+      { key: 'count', label: 'Share', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Requests', type: 'count' }
+    ]
+  },
+  pathDiversity: {
+    file: 'ips-with-high-path-diversity',
+    columns: [
+      { key: 'connectingIp', label: 'Connecting IP', width: '10rem' },
+      { key: 'asOrganization', label: 'Organization', fallback: 'Unknown' },
+      { key: 'distinctPaths', label: 'Distinct paths', type: 'count', width: '9rem' },
+      { key: 'count', label: 'Requests', type: 'count' }
+    ]
+  },
+  trendingPaths: {
+    file: 'trending-paths',
+    columns: [
+      { key: 'path', label: 'Path' },
+      { key: 'earlierCount', label: 'Earlier period', type: 'count' },
+      { key: 'recentCount', label: 'Recent period', type: 'count' },
+      { key: 'recentCount', label: 'Change', type: 'trendDelta' }
+    ]
   }
 }
 
@@ -70,17 +105,31 @@ function escapeHtml(value) {
 }
 
 function isNumeric(column) {
-  return column.type === 'count' || column.type === 'share'
+  return column.type === 'count' || column.type === 'share' || column.type === 'trendDelta'
+}
+
+function trendDelta(row) {
+  const earlier = Number(row.earlierCount) || 0
+  const recent = Number(row.recentCount) || 0
+  return { delta: recent - earlier, pct: earlier > 0 ? (recent - earlier) / earlier : null }
 }
 
 function cellText(column, row) {
   const value = row[column.key]
   if (column.type === 'count') return numberFormat.format(Number(value) || 0)
   if (column.type === 'timestamp') return value ? new Date(`${value}Z`).toLocaleString() : ''
+  if (column.type === 'date') return value ? new Date(`${value}Z`).toLocaleDateString() : ''
+  if (column.type === 'trendDelta') {
+    const { delta, pct } = trendDelta(row)
+    const sign = delta > 0 ? '+' : ''
+    const pctText = pct === null ? 'new' : percentFormat.format(pct)
+    return `${sign}${numberFormat.format(delta)} (${pctText})`
+  }
   return String(value ?? '') || column.fallback || ''
 }
 
 function sortValue(column, row) {
+  if (column.type === 'trendDelta') return trendDelta(row).delta
   if (isNumeric(column)) return Number(row[column.key]) || 0
   return String(row[column.key] ?? '').toLowerCase()
 }
@@ -132,6 +181,11 @@ function renderTable(name) {
           const share = total ? (Number(row[column.key]) || 0) / total : 0
           return `<td class="count"><span class="meter"><span style="width:${Math.min(share * 100, 100)}%"></span></span>${percentFormat.format(share)}</td>`
         }
+        if (column.type === 'trendDelta') {
+          const { delta } = trendDelta(row)
+          const trendClass = delta > 0 ? 'trend-up' : delta < 0 ? 'trend-down' : ''
+          return `<td class="count ${trendClass}">${cellText(column, row)}</td>`
+        }
         const text = cellText(column, row)
         return `<td class="${column.type === 'count' ? 'count' : ''}" title="${escapeHtml(text)}">${escapeHtml(text)}</td>`
       }).join('')}</tr>`).join('')
@@ -160,6 +214,7 @@ function exportCsv(name) {
       const share = total ? (Number(row[column.key]) || 0) / total : 0
       return csvValue(share.toFixed(4))
     }
+    if (column.type === 'trendDelta') return csvValue(trendDelta(row).delta)
     if (column.type === 'count') return csvValue(Number(row[column.key]) || 0)
     return csvValue(cellText(column, row))
   }).join(',')).join('\r\n')
@@ -227,12 +282,16 @@ async function init() {
   const total = Number(data.summary?.totalRequests) || 0
   document.getElementById('total-requests').textContent = numberFormat.format(total)
   document.getElementById('unique-ips').textContent = numberFormat.format(data.summary?.uniqueConnectingIps || 0)
+  const oneTimeIps = (Number(data.summary?.uniqueConnectingIps) || 0) - (data.connectingIps?.length || 0)
+  document.getElementById('one-time-ips').textContent = numberFormat.format(Math.max(oneTimeIps, 0))
   document.getElementById('burst-count').textContent = numberFormat.format(data.bursts?.length || 0)
 
   document.getElementById('meta').textContent =
     `Last ${data.lookbackDays} days · updated ${new Date(data.generatedAt).toLocaleString()}`
   document.getElementById('burst-notice').innerHTML =
     `<strong>Review signal:</strong> ${numberFormat.format(data.burstRequestThreshold)} or more requests from the same IP to the same path with the same user agent within ${numberFormat.format(data.burstWindowMinutes)} minutes. A flagged window is an indicator for investigation, not proof of abuse.`
+  document.getElementById('path-diversity-notice').innerHTML =
+    `<strong>Review signal:</strong> an IP requesting ${numberFormat.format(data.pathDiversityThreshold)} or more distinct app paths within the lookback window. This can indicate scanning or enumeration, independent of total request volume.`
 
   document.getElementById('filter').addEventListener('input', event => {
     state.filter = event.target.value
@@ -253,6 +312,10 @@ async function init() {
   data.organizations ||= []
   data.userAgents ||= []
   data.bursts ||= []
+  data.trend ||= []
+  data.clientFamilies ||= []
+  data.pathDiversity ||= []
+  data.trendingPaths ||= data.trending || []
 
   setupExportButtons()
   setupSorting()

@@ -24,7 +24,7 @@
     h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); margin: 0; letter-spacing: 0; }
     #meta { color: var(--muted); margin: .35rem 0 0; }
     .status { color: var(--accent); background: var(--accent-soft); border-radius: 4px; font-size: .8rem; font-weight: 700; padding: .35rem .6rem; white-space: nowrap; }
-    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 1.5rem 0; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 1.5rem 0; }
     .stat { background: #fff; padding: 1rem 1.2rem; }
     .stat span { color: var(--muted); display: block; font-size: .78rem; font-weight: 700; text-transform: uppercase; }
     .stat strong { display: block; font-size: 1.75rem; font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: .25rem; }
@@ -63,10 +63,12 @@
     .notice { background: var(--warning-soft); border-left: 3px solid var(--warning); color: #6f3217; padding: .8rem 1rem; margin-bottom: 1rem; }
     .notice strong { color: inherit; }
     .empty { color: var(--muted); padding: 2rem; text-align: center; }
+    .trend-up { color: var(--accent); }
+    .trend-down { color: var(--warning); }
     @media (max-width: 700px) {
       main.container { padding-top: 1rem; }
       .masthead, .controls { align-items: stretch; flex-direction: column; }
-      .stats { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
       .tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
       #filter { max-width: none; }
       .section-heading { align-items: start; flex-direction: column; }
@@ -87,6 +89,7 @@
     <section class="stats" aria-label="Request summary">
       <div class="stat"><span>Total requests</span><strong id="total-requests">&mdash;</strong></div>
       <div class="stat"><span>Connecting IPs</span><strong id="unique-ips">&mdash;</strong></div>
+      <div class="stat"><span>One-time IPs</span><strong id="one-time-ips" title="Estimated from the top 500 repeat IPs; may undercount repeats beyond that.">&mdash;</strong></div>
       <div class="stat"><span>Flagged bursts</span><strong id="burst-count">&mdash;</strong></div>
     </section>
 
@@ -102,11 +105,17 @@
     <section id="traffic-panel" role="tabpanel" aria-labelledby="traffic-tab">
       <nav class="jump-links" aria-label="Jump to a table in this view">
         <span>Jump to</span>
+        <a href="#table-trend">Daily traffic trend</a>
         <a href="#table-paths">Requests by path</a>
+        <a href="#table-trendingPaths">Trending paths</a>
         <a href="#table-connectingIps">Requests by connecting IP</a>
       </nav>
+      <div class="section-heading" id="table-trend" data-table="trend"><div class="heading-text"><h2>Daily traffic trend</h2><p>Total requests and unique connecting IPs per day</p></div></div>
+      <figure data-table="trend"></figure>
       <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
       <figure data-table="paths"></figure>
+      <div class="section-heading" id="table-trendingPaths" data-table="trendingPaths"><div class="heading-text"><h2>Trending paths</h2><p>Comparing the first and second half of the lookback window</p></div></div>
+      <figure data-table="trendingPaths"></figure>
       <div class="section-heading" id="table-connectingIps" data-table="connectingIps"><div class="heading-text"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div></div>
       <figure data-table="connectingIps"></figure>
     </section>
@@ -116,24 +125,31 @@
         <span>Jump to</span>
         <a href="#table-locations">Country and region</a>
         <a href="#table-userAgents">User agents</a>
+        <a href="#table-clientFamilies">Client families</a>
         <a href="#table-organizations">Network organizations</a>
       </nav>
       <div class="section-heading" id="table-locations" data-table="locations"><div class="heading-text"><h2>Country and region</h2><p>Where API traffic originates</p></div></div>
       <figure data-table="locations"></figure>
       <div class="section-heading" id="table-userAgents" data-table="userAgents"><div class="heading-text"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div></div>
       <figure data-table="userAgents"></figure>
+      <div class="section-heading" id="table-clientFamilies" data-table="clientFamilies"><div class="heading-text"><h2>Client families</h2><p>User agents grouped by name, collapsing version/build suffixes</p></div></div>
+      <figure data-table="clientFamilies"></figure>
       <div class="section-heading" id="table-organizations" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>ISP or company reported by the connecting network</p></div></div>
       <figure data-table="organizations"></figure>
     </section>
 
     <section id="abuse-panel" role="tabpanel" aria-labelledby="abuse-tab" hidden>
       <div id="burst-notice" class="notice">Loading detection criteria&hellip;</div>
+      <div id="path-diversity-notice" class="notice">Loading detection criteria&hellip;</div>
       <nav class="jump-links" aria-label="Jump to a table in this view">
         <span>Jump to</span>
         <a href="#table-bursts">High-volume request windows</a>
+        <a href="#table-pathDiversity">IPs requesting many distinct paths</a>
       </nav>
       <div class="section-heading" id="table-bursts" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
       <figure data-table="bursts"></figure>
+      <div class="section-heading" id="table-pathDiversity" data-table="pathDiversity"><div class="heading-text"><h2>IPs requesting many distinct paths</h2><p>Possible scanning behavior, independent of request volume</p></div></div>
+      <figure data-table="pathDiversity"></figure>
     </section>
 
   </main>

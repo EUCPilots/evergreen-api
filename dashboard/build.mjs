@@ -5,6 +5,7 @@ const CF_DATASET = process.env.CF_DATASET || 'evergreen_requests'
 const LOOKBACK_DAYS = process.env.LOOKBACK_DAYS || '30'
 const BURST_WINDOW_MINUTES = process.env.BURST_WINDOW_MINUTES || '15'
 const BURST_REQUEST_THRESHOLD = process.env.BURST_REQUEST_THRESHOLD || '10'
+const PATH_DIVERSITY_THRESHOLD = process.env.PATH_DIVERSITY_THRESHOLD || '5'
 
 if (!CF_API_TOKEN || !CF_ACCOUNT_ID) {
   console.error('CF_API_TOKEN and CF_ACCOUNT_ID environment variables are required')
@@ -16,6 +17,9 @@ const SQL_API_URL = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_
 const lookbackDays = parsePositiveInteger('LOOKBACK_DAYS', LOOKBACK_DAYS)
 const burstWindowMinutes = parsePositiveInteger('BURST_WINDOW_MINUTES', BURST_WINDOW_MINUTES)
 const burstRequestThreshold = parsePositiveInteger('BURST_REQUEST_THRESHOLD', BURST_REQUEST_THRESHOLD)
+const pathDiversityThreshold = parsePositiveInteger('PATH_DIVERSITY_THRESHOLD', PATH_DIVERSITY_THRESHOLD)
+// Splits the lookback window in half to compare recent vs earlier traffic per path
+const halfLookbackDays = Math.max(1, Math.floor(lookbackDays / 2))
 
 if (!/^[A-Za-z0-9_]+$/.test(CF_DATASET)) {
   throw new Error('CF_DATASET may only contain letters, numbers, and underscores')
@@ -23,6 +27,7 @@ if (!/^[A-Za-z0-9_]+$/.test(CF_DATASET)) {
 
 // blob1=path, blob2=country, blob3=region, blob4=city, blob5=userAgent,
 // blob6=connectingIp, blob7=asOrganization (see src/index.js logToAnalyticsEngine)
+// trend/clientFamilies/pathDiversity/trending below reuse these same blobs
 const recentData = `FROM ${CF_DATASET}
 WHERE timestamp > NOW() - INTERVAL '${lookbackDays}' DAY`
 
@@ -86,6 +91,41 @@ ${recentData} AND blob6 != ''
 GROUP BY windowStart, blob6, blob1, blob5, blob7
 HAVING count >= ${burstRequestThreshold}
 ORDER BY count DESC
+LIMIT 500`,
+  trend: `SELECT
+  toStartOfDay(timestamp) AS day,
+  SUM(_sample_interval) AS count,
+  COUNT(DISTINCT blob6) - if(countIf(blob6 = '') > 0, 1, 0) AS uniqueConnectingIps
+${recentData}
+GROUP BY day
+ORDER BY day ASC`,
+  // Groups the text before the first '/' in the user agent, collapsing noisy version/build suffixes
+  clientFamilies: `SELECT
+  if(position('/' IN blob5) > 0, substring(blob5, 1, position('/' IN blob5) - 1), blob5) AS family,
+  SUM(_sample_interval) AS count,
+  COUNT(DISTINCT blob5) AS variants
+${recentData} AND blob5 != ''
+GROUP BY family
+ORDER BY count DESC
+LIMIT 500`,
+  pathDiversity: `SELECT
+  blob6 AS connectingIp,
+  argMax(blob7, _sample_interval) AS asOrganization,
+  COUNT(DISTINCT blob1) AS distinctPaths,
+  SUM(_sample_interval) AS count
+${recentData} AND blob6 != ''
+GROUP BY blob6
+HAVING distinctPaths >= ${pathDiversityThreshold}
+ORDER BY distinctPaths DESC, count DESC
+LIMIT 500`,
+  trending: `SELECT
+  blob1 AS path,
+  sumIf(_sample_interval, timestamp < NOW() - INTERVAL '${halfLookbackDays}' DAY) AS earlierCount,
+  sumIf(_sample_interval, timestamp >= NOW() - INTERVAL '${halfLookbackDays}' DAY) AS recentCount
+${recentData}
+GROUP BY blob1
+HAVING earlierCount > 0 OR recentCount > 0
+ORDER BY recentCount DESC
 LIMIT 500`
 }
 
@@ -131,13 +171,19 @@ async function main() {
     dataset: CF_DATASET,
     burstWindowMinutes,
     burstRequestThreshold,
+    pathDiversityThreshold,
+    halfLookbackDays,
     summary,
     connectingIps: data.connectingIps,
     paths: data.paths,
     locations: data.locations,
     organizations: data.organizations,
     userAgents: data.userAgents,
-    bursts: data.bursts
+    bursts: data.bursts,
+    trend: data.trend,
+    clientFamilies: data.clientFamilies,
+    pathDiversity: data.pathDiversity,
+    trending: data.trending
   }
 
   const fs = await import('node:fs/promises')
