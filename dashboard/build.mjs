@@ -96,13 +96,17 @@ async function runQuery(sql) {
     body: sql
   })
 
-  const body = await response.json()
+  const text = await response.text()
 
   if (!response.ok) {
-    throw new Error(`Analytics Engine SQL API error (${response.status}): ${JSON.stringify(body)}`)
+    throw new Error(`Analytics Engine SQL API error (${response.status}): ${text}`)
   }
 
-  return body
+  try {
+    return JSON.parse(text)
+  } catch (err) {
+    throw new Error(`Analytics Engine SQL API returned non-JSON response: ${text.slice(0, 500)}`)
+  }
 }
 
 async function main() {
