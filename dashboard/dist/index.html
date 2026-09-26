@@ -38,8 +38,9 @@
     .jump-links { border: 1px solid var(--line); border-radius: 6px; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin-bottom: 1rem; padding: .6rem .8rem; }
     .jump-links span { color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
     .jump-links a { font-size: .82rem; }
-    .back-to-top { display: block; font-size: .82rem; margin: .5rem 0 0; text-align: right; }
-    .page-foot { border-top: 1px solid var(--line); margin-top: 2.5rem; padding-top: 1rem; text-align: center; }
+    .back-to-top { align-items: center; background: var(--ink); border: 1px solid var(--line); border-radius: 50%; bottom: 1rem; box-shadow: 0 2px 8px #17211b33; color: #fff; display: flex; font-size: 1.35rem; height: 2.75rem; justify-content: center; margin: 0; padding: 0; position: fixed; right: 1rem; width: 2.75rem; z-index: 10; }
+    .back-to-top:hover { background: var(--accent); }
+    .back-to-top[hidden] { display: none; }
     .section-heading h2 { font-size: 1.05rem; margin: 0; }
     .section-heading p { color: var(--muted); font-size: .82rem; margin: 0; }
     .heading-text { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex: 1; }
@@ -106,10 +107,8 @@
       </nav>
       <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
       <figure data-table="paths"></figure>
-      <a class="back-to-top" href="#top">Back to top &uarr;</a>
       <div class="section-heading" id="table-connectingIps" data-table="connectingIps"><div class="heading-text"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div></div>
       <figure data-table="connectingIps"></figure>
-      <a class="back-to-top" href="#top">Back to top &uarr;</a>
     </section>
 
     <section id="audience-panel" role="tabpanel" aria-labelledby="audience-tab" hidden>
@@ -121,13 +120,10 @@
       </nav>
       <div class="section-heading" id="table-locations" data-table="locations"><div class="heading-text"><h2>Country and region</h2><p>Where API traffic originates</p></div></div>
       <figure data-table="locations"></figure>
-      <a class="back-to-top" href="#top">Back to top &uarr;</a>
       <div class="section-heading" id="table-userAgents" data-table="userAgents"><div class="heading-text"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div></div>
       <figure data-table="userAgents"></figure>
-      <a class="back-to-top" href="#top">Back to top &uarr;</a>
       <div class="section-heading" id="table-organizations" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>ISP or company reported by the connecting network</p></div></div>
       <figure data-table="organizations"></figure>
-      <a class="back-to-top" href="#top">Back to top &uarr;</a>
     </section>
 
     <section id="abuse-panel" role="tabpanel" aria-labelledby="abuse-tab" hidden>
@@ -138,11 +134,10 @@
       </nav>
       <div class="section-heading" id="table-bursts" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
       <figure data-table="bursts"></figure>
-      <a class="back-to-top" href="#top">Back to top &uarr;</a>
     </section>
 
-    <footer class="page-foot"><a href="#top">Back to top &uarr;</a></footer>
   </main>
+  <button class="back-to-top" id="back-to-top" type="button" aria-label="Back to top" title="Back to top" hidden><span aria-hidden="true">&uarr;</span></button>
   <script src="app.js"></script>
 </body>
 </html>

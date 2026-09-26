@@ -202,7 +202,23 @@ function setupSorting() {
   })
 }
 
+function setupBackToTop() {
+  const button = document.getElementById('back-to-top')
+  const updateVisibility = () => { button.hidden = window.scrollY < 400 }
+
+  window.addEventListener('scroll', updateVisibility, { passive: true })
+  updateVisibility()
+  button.addEventListener('click', () => {
+    window.scrollTo({
+      top: 0,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+    })
+  })
+}
+
 async function init() {
+  setupBackToTop()
+
   const res = await fetch('data.json', { cache: 'no-store' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const data = await res.json()

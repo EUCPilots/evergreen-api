@@ -47,14 +47,30 @@ const queries = {
   SUM(_sample_interval) AS totalRequests,
   COUNT(DISTINCT blob6) - if(countIf(blob6 = '') > 0, 1, 0) AS uniqueConnectingIps
 ${recentData}`,
-  connectingIps: dimensionQuery('blob6', 'connectingIp'),
+  connectingIps: `SELECT blob6 AS connectingIp, SUM(_sample_interval) AS count
+${recentData} AND blob6 != ''
+GROUP BY blob6
+HAVING count > 1
+ORDER BY count DESC
+LIMIT 500`,
   paths: dimensionQuery('blob1', 'path'),
   locations: `SELECT blob2 AS country, blob3 AS region, SUM(_sample_interval) AS count
 ${recentData} AND (blob2 != '' OR blob3 != '')
 GROUP BY blob2, blob3
 ORDER BY count DESC
 LIMIT 500`,
-  organizations: dimensionQuery('blob7', 'asOrganization'),
+  organizations: `SELECT blob7 AS asOrganization, SUM(_sample_interval) AS count
+${recentData} AND blob7 != ''
+  AND blob6 IN (
+    SELECT blob6
+    FROM ${CF_DATASET}
+    WHERE timestamp > NOW() - INTERVAL '${lookbackDays}' DAY AND blob6 != ''
+    GROUP BY blob6
+    HAVING SUM(_sample_interval) > 1
+  )
+GROUP BY blob7
+ORDER BY count DESC
+LIMIT 500`,
   userAgents: dimensionQuery('blob5', 'userAgent'),
   bursts: `SELECT
   toStartOfInterval(timestamp, INTERVAL '${burstWindowMinutes}' MINUTE) AS windowStart,
