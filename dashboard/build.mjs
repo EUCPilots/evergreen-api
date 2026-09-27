@@ -129,32 +129,56 @@ ORDER BY recentCount DESC
 LIMIT 500`
 }
 
-async function runQuery(sql) {
-  const response = await fetch(SQL_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${CF_API_TOKEN}`,
-      'Content-Type': 'text/plain'
-    },
-    body: sql
-  })
+const QUERY_RETRY_ATTEMPTS = 3
+const QUERY_RETRY_DELAY_MS = 1000
 
-  const text = await response.text()
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
-  if (!response.ok) {
-    throw new Error(`Analytics Engine SQL API error (${response.status}): ${text}`)
+async function runQuery(sql, name = 'query') {
+  let lastError
+
+  for (let attempt = 1; attempt <= QUERY_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(SQL_API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${CF_API_TOKEN}`,
+          'Content-Type': 'text/plain'
+        },
+        body: sql
+      })
+
+      const text = await response.text()
+
+      if (!response.ok) {
+        // Analytics Engine SQL API returns opaque 5xx errors intermittently; these are worth retrying
+        if (response.status >= 500 && attempt < QUERY_RETRY_ATTEMPTS) {
+          lastError = new Error(`[${name}] Analytics Engine SQL API error (${response.status}): ${text}`)
+          await sleep(QUERY_RETRY_DELAY_MS * attempt)
+          continue
+        }
+        throw new Error(`[${name}] Analytics Engine SQL API error (${response.status}): ${text}`)
+      }
+
+      try {
+        return JSON.parse(text)
+      } catch (err) {
+        throw new Error(`[${name}] Analytics Engine SQL API returned non-JSON response: ${text.slice(0, 500)}`)
+      }
+    } catch (err) {
+      lastError = err
+      if (attempt >= QUERY_RETRY_ATTEMPTS) break
+    }
   }
 
-  try {
-    return JSON.parse(text)
-  } catch (err) {
-    throw new Error(`Analytics Engine SQL API returned non-JSON response: ${text.slice(0, 500)}`)
-  }
+  throw lastError
 }
 
 async function main() {
   const entries = await Promise.all(Object.entries(queries).map(async ([name, sql]) => {
-    const result = await runQuery(sql)
+    const result = await runQuery(sql, name)
     return [name, result.data || []]
   }))
   const data = Object.fromEntries(entries)
@@ -162,7 +186,7 @@ async function main() {
 
   const repeatIps = data.connectingIps.map(row => row.connectingIp)
   data.organizations = repeatIps.length > 0
-    ? (await runQuery(organizationsQuery(repeatIps))).data || []
+    ? (await runQuery(organizationsQuery(repeatIps), 'organizations')).data || []
     : []
 
   const output = {
