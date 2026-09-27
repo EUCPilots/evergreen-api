@@ -62,6 +62,33 @@ ORDER BY count DESC
 LIMIT 500`
 }
 
+// Analytics Engine SQL API rejects queries over 10000 chars, so the IN list is split into batches
+const MAX_QUERY_LENGTH = 10000
+const QUERY_LENGTH_SAFETY_MARGIN = 500
+
+function chunkConnectingIps(connectingIps) {
+  const baseLength = organizationsQuery([]).length
+  const budget = MAX_QUERY_LENGTH - QUERY_LENGTH_SAFETY_MARGIN - baseLength
+  const chunks = []
+  let current = []
+  let currentLength = 0
+
+  for (const ip of connectingIps) {
+    // +2 accounts for the ", " separator between items
+    const itemLength = sqlStringLiteral(ip).length + 2
+    if (current.length > 0 && currentLength + itemLength > budget) {
+      chunks.push(current)
+      current = []
+      currentLength = 0
+    }
+    current.push(ip)
+    currentLength += itemLength
+  }
+  if (current.length > 0) chunks.push(current)
+
+  return chunks
+}
+
 const queries = {
   summary: `SELECT
   SUM(_sample_interval) AS totalRequests,
@@ -176,6 +203,26 @@ async function runQuery(sql, name = 'query') {
   throw lastError
 }
 
+async function fetchOrganizations(connectingIps) {
+  if (connectingIps.length === 0) return []
+
+  const chunks = chunkConnectingIps(connectingIps)
+  const results = await Promise.all(
+    chunks.map((chunk, i) => runQuery(organizationsQuery(chunk), `organizations[${i}]`))
+  )
+
+  const counts = new Map()
+  for (const result of results) {
+    for (const row of result.data || []) {
+      counts.set(row.asOrganization, (counts.get(row.asOrganization) || 0) + row.count)
+    }
+  }
+
+  return Array.from(counts, ([asOrganization, count]) => ({ asOrganization, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 500)
+}
+
 async function main() {
   const entries = await Promise.all(Object.entries(queries).map(async ([name, sql]) => {
     const result = await runQuery(sql, name)
@@ -185,9 +232,7 @@ async function main() {
   const summary = data.summary[0] || { totalRequests: 0, uniqueConnectingIps: 0 }
 
   const repeatIps = data.connectingIps.map(row => row.connectingIp)
-  data.organizations = repeatIps.length > 0
-    ? (await runQuery(organizationsQuery(repeatIps), 'organizations')).data || []
-    : []
+  data.organizations = await fetchOrganizations(repeatIps)
 
   const output = {
     generatedAt: new Date().toISOString(),
