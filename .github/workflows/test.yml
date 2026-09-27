@@ -56,6 +56,7 @@ jobs:
           npm test
         env:
           NODE_ENV: test
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
 
       - name: Generate test report
         if: always()
@@ -63,6 +64,8 @@ jobs:
           cd tests
           npx mocha test.js --timeout 30000 --reporter json > test-results.json || true
           npx mocha test.js --timeout 30000 --reporter tap > test-results.tap || true
+        env:
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
 
       - name: Upload test results
         if: always()

@@ -117,6 +117,12 @@ function ensureAnalyticsBinding() {
   return true
 }
 
+// Requests from the automated test suite are excluded from logging to keep dashboard data clean
+function isTestRequest(request) {
+  if (typeof TEST_USER_AGENT === 'undefined' || !TEST_USER_AGENT) return false
+  return request.headers.get('user-agent') === TEST_USER_AGENT
+}
+
 // === MEMORY + KV CACHING (SIMPLIFIED) ===
 
 // In-memory cache functions
@@ -528,6 +534,7 @@ export default {
     globalThis.EVERGREEN = env.EVERGREEN
     globalThis.LOGS_BUCKET = env.LOGS_BUCKET
     globalThis.REQUEST_ANALYTICS = env.REQUEST_ANALYTICS
+    globalThis.TEST_USER_AGENT = env.TEST_USER_AGENT
 
     const startTime = Date.now()
     const url = new URL(request.url)
@@ -543,7 +550,7 @@ export default {
     const shouldLog = (
       exactEndpoints.includes(path) ||
       prefixEndpoints.some(endpoint => path.startsWith(endpoint))
-    ) && path !== '/health';
+    ) && path !== '/health' && !isTestRequest(request);
 
     const response = await app.handleRequest(request)
 

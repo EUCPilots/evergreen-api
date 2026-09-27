@@ -8,8 +8,12 @@ before(async () => {
 });
 
 // Test configuration
-const TEST_USER_AGENT = 'EvergreenAPI_Tests/1.0.0';
+const TEST_USER_AGENT = process.env.API_TEST_USERAGENT;
 const TIMEOUT = 30000; // 30 seconds for external API calls
+
+if (!TEST_USER_AGENT) {
+    throw new Error('API_TEST_USERAGENT environment variable is required');
+}
 
 // Helper function to make requests with proper headers
 function makeRequest(path) {

@@ -60,6 +60,8 @@ jobs:
           
           # Run cache-specific tests
           npx mocha test.js --timeout 30000 --grep "Caching" --reporter spec
+        env:
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
 
       - name: Validate cache headers
         run: |
@@ -105,6 +107,8 @@ jobs:
             echo "Cache TTL test results:"
             cat cache-ttl-results.json | python3 -m json.tool
           fi
+        env:
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
 
       - name: Check for cache optimization
         run: |
