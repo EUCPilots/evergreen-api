@@ -46,7 +46,7 @@ $Logs = $ListResponse.S3Objects | ForEach-Object {
     $Reader = New-Object -TypeName "System.IO.StreamReader"($GetResponse.ResponseStream)
     $Content = $Reader.ReadToEnd()
     $Reader.Close()
-    if ($Content -notmatch "EvergreenAPI_Tests|Rate-Limit-Test|GitHub-Actions-Performance-Test|Security-Test") { $Content | ConvertFrom-Json }
+    $Content | ConvertFrom-Json
 }
 $Logs | Sort-Object -Property timestamp -Descending | `
 Select-Object -Property path, connectingIp, country, region, asOrganisation, userAgent | Format-Table -AutoSize
