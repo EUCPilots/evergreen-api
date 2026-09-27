@@ -314,6 +314,8 @@ jobs:
               -H "User-Agent: GitHub-Actions-Performance-Test/1.0.0" \
               "https://evergreen-api.stealthpuppy.com/health"
           done
+        env:
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
 
   comment-pr:
     name: Comment Test Results
