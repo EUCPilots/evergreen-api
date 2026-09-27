@@ -119,8 +119,8 @@ function ensureAnalyticsBinding() {
 
 // Requests from the automated test suite are excluded from logging to keep dashboard data clean
 function isTestRequest(request) {
-  if (typeof TEST_USER_AGENT === 'undefined' || !TEST_USER_AGENT) return false
-  return request.headers.get('user-agent') === TEST_USER_AGENT
+  if (typeof API_TEST_USERAGENT === 'undefined' || !API_TEST_USERAGENT) return false
+  return request.headers.get('user-agent') === API_TEST_USERAGENT
 }
 
 // === MEMORY + KV CACHING (SIMPLIFIED) ===
@@ -534,7 +534,7 @@ export default {
     globalThis.EVERGREEN = env.EVERGREEN
     globalThis.LOGS_BUCKET = env.LOGS_BUCKET
     globalThis.REQUEST_ANALYTICS = env.REQUEST_ANALYTICS
-    globalThis.TEST_USER_AGENT = env.TEST_USER_AGENT
+    globalThis.API_TEST_USERAGENT = env.API_TEST_USERAGENT
 
     const startTime = Date.now()
     const url = new URL(request.url)
