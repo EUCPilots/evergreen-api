@@ -2,9 +2,11 @@ const state = {
   data: null,
   activePanel: 'traffic-panel',
   filter: '',
+  showLowVolumeRows: false,
   sort: {}
 }
 
+const MIN_ROW_VALUE = 5
 const numberFormat = new Intl.NumberFormat()
 const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 })
 
@@ -28,7 +30,7 @@ const TABLES = {
   locations: {
     file: 'country-and-region',
     columns: [
-      { key: 'country', label: 'Country', fallback: 'Unknown', width: '10rem' },
+      { key: 'country', label: 'Country', fallback: 'Unknown', width: '11rem' },
       { key: 'region', label: 'Region', fallback: 'Unknown' },
       { key: 'count', label: 'Share', type: 'share', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
@@ -54,7 +56,7 @@ const TABLES = {
     file: 'high-volume-request-windows',
     columns: [
       { key: 'windowStart', label: 'Window (UTC)', type: 'timestamp', width: '12rem' },
-      { key: 'connectingIp', label: 'Connecting IP', width: '10rem' },
+      { key: 'connectingIp', label: 'Connecting IP', width: '11rem' },
       { key: 'path', label: 'Path' },
       { key: 'asOrganization', label: 'Organization', fallback: 'Unknown' },
       { key: 'userAgent', label: 'User agent' },
@@ -64,7 +66,7 @@ const TABLES = {
   trend: {
     file: 'daily-traffic-trend',
     columns: [
-      { key: 'day', label: 'Day', type: 'date', width: '10rem' },
+      { key: 'day', label: 'Day', type: 'date', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' },
       { key: 'uniqueConnectingIps', label: 'Unique IPs', type: 'count' }
     ]
@@ -80,8 +82,9 @@ const TABLES = {
   },
   pathDiversity: {
     file: 'ips-with-high-path-diversity',
+    minimumValueKeys: ['distinctPaths'],
     columns: [
-      { key: 'connectingIp', label: 'Connecting IP', width: '10rem' },
+      { key: 'connectingIp', label: 'Connecting IP', width: '11rem' },
       { key: 'asOrganization', label: 'Organization', fallback: 'Unknown' },
       { key: 'distinctPaths', label: 'Distinct paths', type: 'count', width: '9rem' },
       { key: 'count', label: 'Requests', type: 'count' }
@@ -89,10 +92,11 @@ const TABLES = {
   },
   trendingPaths: {
     file: 'trending-paths',
+    minimumValueKeys: ['earlierCount', 'recentCount'],
     columns: [
       { key: 'path', label: 'Path' },
-      { key: 'earlierCount', label: 'Earlier period', type: 'count' },
-      { key: 'recentCount', label: 'Recent period', type: 'count' },
+      { key: 'earlierCount', label: 'Earlier period', type: 'count', width: '11rem' },
+      { key: 'recentCount', label: 'Recent period', type: 'count', width: '11rem' },
       { key: 'recentCount', label: 'Change', type: 'trendDelta' }
     ]
   }
@@ -140,8 +144,14 @@ function applyFilter(rows) {
   return rows.filter(row => Object.values(row).some(value => String(value ?? '').toLowerCase().includes(needle)))
 }
 
+function meetsMinimumValue(name, row) {
+  if (state.showLowVolumeRows) return true
+  const keys = TABLES[name].minimumValueKeys || ['count']
+  return keys.some(key => Number(row[key]) >= MIN_ROW_VALUE)
+}
+
 function visibleRows(name) {
-  const rows = applyFilter(state.data[name] || [])
+  const rows = applyFilter((state.data[name] || []).filter(row => meetsMinimumValue(name, row)))
   const sort = state.sort[name]
   if (!sort) return rows
   const column = TABLES[name].columns[sort.index]
@@ -295,6 +305,14 @@ async function init() {
 
   document.getElementById('filter').addEventListener('input', event => {
     state.filter = event.target.value
+    render()
+  })
+
+  const rowThresholdToggle = document.getElementById('row-threshold-toggle')
+  rowThresholdToggle.addEventListener('click', () => {
+    state.showLowVolumeRows = !state.showLowVolumeRows
+    rowThresholdToggle.setAttribute('aria-pressed', String(state.showLowVolumeRows))
+    rowThresholdToggle.textContent = state.showLowVolumeRows ? 'Hide rows under 5' : 'Show rows under 5'
     render()
   })
 
