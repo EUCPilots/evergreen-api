@@ -41,13 +41,13 @@ The API includes caching headers to optimize performance:
 
 ```bash
 # List all applications
-curl https://evergreen-api.stealthpuppy.com/apps
+curl -sS -H "User-Agent: App-Pipeline/1.0.0 (Contoso; https://contoso.com)" https://evergreen-api.stealthpuppy.com/apps
 
 # Get Microsoft Edge details
-curl https://evergreen-api.stealthpuppy.com/app/MicrosoftEdge
+curl -sS -H "User-Agent: App-Pipeline/1.0.0 (Contoso; https://contoso.com)" https://evergreen-api.stealthpuppy.com/app/MicrosoftEdge
 
 # Get version check endpoints
-curl https://evergreen-api.stealthpuppy.com/endpoints/versions
+curl -sS -H "User-Agent: App-Pipeline/1.0.0 (Contoso; https://contoso.com)" https://evergreen-api.stealthpuppy.com/endpoints/versions
 ```
 
 ## Using the Schema
@@ -137,14 +137,22 @@ The OpenAPI schema includes:
 
 ```typescript
 // Using fetch API
-const response = await fetch('https://evergreen-api.stealthpuppy.com/apps');
+const response = await fetch('https://evergreen-api.stealthpuppy.com/apps', {
+  headers: {
+    'User-Agent': 'App-Pipeline/1.0.0 (Contoso; https://contoso.com)'
+  }
+});
 const apps = await response.json();
 
 // Using generated client
 import { DefaultApi } from './generated/typescript';
 
 const api = new DefaultApi();
-const apps = await api.appsGet();
+const apps = await api.appsGet({
+  headers: {
+    'User-Agent': 'App-Pipeline/1.0.0 (Contoso; https://contoso.com)'
+  }
+});
 ```
 
 ### Python
@@ -153,24 +161,28 @@ const apps = await api.appsGet();
 import requests
 
 # Direct API call
-response = requests.get('https://evergreen-api.stealthpuppy.com/apps')
+response = requests.get(
+    'https://evergreen-api.stealthpuppy.com/apps',
+    headers={'User-Agent': 'App-Pipeline/1.0.0 (Contoso; https://contoso.com)'}
+)
 apps = response.json()
 
 # Using generated client
 from generated.python import DefaultApi
 
 api = DefaultApi()
-apps = api.apps_get()
+apps = api.apps_get(headers={'User-Agent': 'App-Pipeline/1.0.0 (Contoso; https://contoso.com)'})
 ```
 
 ### PowerShell
 
 ```powershell
 # Direct API call
-$apps = Invoke-RestMethod -Uri 'https://evergreen-api.stealthpuppy.com/apps'
+$headers = @{ 'User-Agent' = 'App-Pipeline/1.0.0 (Contoso; https://contoso.com)' }
+$apps = Invoke-RestMethod -Uri 'https://evergreen-api.stealthpuppy.com/apps' -Headers $headers
 
 # Get specific app
-$edge = Invoke-RestMethod -Uri 'https://evergreen-api.stealthpuppy.com/app/MicrosoftEdge'
+$edge = Invoke-RestMethod -Uri 'https://evergreen-api.stealthpuppy.com/app/MicrosoftEdge' -Headers $headers
 ```
 
 ## Contributing
