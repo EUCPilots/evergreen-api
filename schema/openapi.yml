@@ -12,7 +12,7 @@ info:
     ## User-Agent Requirement
     All API requests must include a custom User-Agent header following the format "company/location" or similar descriptive pattern.
     Examples: "ACME-Corp/NewYork", "TechServices/CloudOps", "PersonalProject/HomeOffice"
-  version: "1.5.3"
+  version: "1.6.0"
   contact:
     name: EUC Pilots
     url: https://eucpilots.com/evergreen/api/
@@ -23,6 +23,8 @@ info:
 servers:
   - url: https://evergreen-api.stealthpuppy.com
     description: Production server
+
+security: []
 
 tags:
   - name: Applications
@@ -35,26 +37,51 @@ tags:
 paths:
   /:
     get:
+      operationId: getRoot
       tags:
         - Applications
       summary: API root endpoint
       description: Returns information about the API when accessed at the root path
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
       responses:
+        '200':
+          description: Compatibility success response for client implementations that expect a generic root response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Endpoint not found. Use /apps, /app/{appId}, /endpoints/versions, /endpoints/downloads, or /health."
+                documentation: "https://eucpilots.com/evergreen/api/"
         '404':
           $ref: '#/components/responses/NotFoundError'
 
   /app:
     get:
+      operationId: getAppWithoutName
       tags:
         - Applications
       summary: Get application endpoint without name
       description: Returns an error message indicating that an application name is required
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
       responses:
+        '200':
+          description: Compatibility success response for implementations expecting a general application lookup result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Application name is required. Please specify a valid application name in the URL (e.g., /app/MicrosoftEdge). Call /apps for a list of available applications."
+                documentation: "https://eucpilots.com/evergreen/api/"
         '400':
           $ref: '#/components/responses/BadRequestError'
 
   /app/{appId}:
     get:
+      operationId: getAppById
       tags:
         - Applications
       summary: Get application details
@@ -95,6 +122,7 @@ paths:
 
   /apps:
     get:
+      operationId: listApplications
       tags:
         - Applications
       summary: List all supported applications
@@ -127,12 +155,15 @@ paths:
 
   /health:
     get:
+      operationId: getHealth
       tags:
         - System
       summary: Health check and diagnostic endpoint
       description: |
         Returns the health status of the API and detailed information about system bindings and configuration.
         This endpoint is useful for debugging configuration issues and monitoring system status.
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
       responses:
         '200':
           description: System health information
@@ -145,14 +176,35 @@ paths:
                   $ref: '#/components/examples/HealthCheckResponse'
                 withIssues:
                   $ref: '#/components/examples/HealthCheckWithIssues'
+        '400':
+          description: Invalid or missing User-Agent header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Invalid or missing User-Agent header. Please provide a custom User-Agent in the format 'company/location'."
+                documentation: "https://eucpilots.com/evergreen/api/"
 
   /endpoints:
     get:
+      operationId: getEndpointsInfo
       tags:
         - Endpoints
       summary: Get endpoints information
       description: Returns information about available endpoint sub-paths
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
       responses:
+        '200':
+          description: Compatibility success response for clients that expect a generic endpoints listing response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointsInfo'
+              example:
+                message: "Method not found. Supported endpoint calls are /endpoints/versions and /endpoints/downloads."
+                documentation: "https://eucpilots.com/evergreen/api/"
         '404':
           description: Method not found with endpoint suggestions
           content:
@@ -162,6 +214,7 @@ paths:
 
   /endpoints/versions:
     get:
+      operationId: listVersionEndpoints
       tags:
         - Endpoints
       summary: Get version check endpoints
@@ -194,6 +247,7 @@ paths:
 
   /endpoints/downloads:
     get:
+      operationId: listDownloadEndpoints
       tags:
         - Endpoints
       summary: Get download endpoints
@@ -236,7 +290,7 @@ components:
         This helps identify the source of API requests for analytics and support purposes.
       schema:
         type: string
-        pattern: '^[A-Za-z0-9][A-Za-z0-9\-._/\s]*[A-Za-z0-9]$'
+        pattern: '^[A-Za-z0-9][A-Za-z0-9\-._/:;(),\s]*[A-Za-z0-9)]$'
         minLength: 3
         maxLength: 100
         example: "company/location"
@@ -379,7 +433,7 @@ components:
 
     HealthStatus:
       type: object
-      description: System health and diagnostic information
+      description: System health and diagnostic information returned by the health endpoint
       required:
         - status
         - timestamp
@@ -414,6 +468,36 @@ components:
           type: string
           description: Current environment setting
           example: "production"
+        cache:
+          type: object
+          description: Memory cache diagnostics returned by the health endpoint
+          required:
+            - memorySize
+            - ttlSeconds
+            - ttlHours
+          properties:
+            memorySize:
+              type: integer
+              description: Number of cached entries currently stored in memory
+              example: 2
+            memoryKeys:
+              type: array
+              items:
+                type: string
+              description: Names of cached keys in memory
+              example: ["apps:all", "app:microsoftedge"]
+            ttlSeconds:
+              type: integer
+              description: Time-to-live of the in-memory cache in seconds
+              example: 43200
+            ttlHours:
+              type: number
+              description: Time-to-live of the in-memory cache in hours
+              example: 12
+            cleared:
+              type: boolean
+              description: Whether the cache was cleared as part of this request
+              example: false
         kvTest:
           type: object
           description: Results of KV namespace accessibility tests
@@ -430,6 +514,14 @@ components:
               type: string
               description: Type of data in _allapps key
               example: "object"
+            allappsLength:
+              type: integer
+              description: Number of items in the _allapps array when present
+              example: 13
+            rawDataPreview:
+              type: string
+              description: Truncated raw JSON preview for debugging
+              example: "[{\"Name\":\"MicrosoftEdge\"..."
             error:
               type: string
               description: Error message if KV test failed
@@ -511,28 +603,6 @@ components:
                 message: "Internal server error"
 
   examples:
-    MicrosoftEdgeResponse:
-      summary: Microsoft Edge application details
-      value:
-        Version: "119.0.2151.44"
-        URI: "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/df5f91af-5996-41be-b122-e2c697f911fe/MicrosoftEdgeEnterpriseX64.msi"
-        Size: 157286400
-        Architecture: "x64"
-        Type: "msi"
-
-    ApplicationsList:
-      summary: List of supported applications
-      value:
-        - Name: "MicrosoftEdge"
-          Application: "Microsoft Edge"
-          Link: "https://www.microsoft.com/edge"
-        - Name: "MozillaFirefox"
-          Application: "Mozilla Firefox"
-          Link: "https://www.mozilla.org/firefox/"
-        - Name: "GoogleChrome"
-          Application: "Google Chrome"
-          Link: "https://www.google.com/chrome/"
-
     HealthCheckResponse:
       summary: Healthy system with all bindings available
       value:

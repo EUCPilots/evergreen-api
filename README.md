@@ -14,6 +14,13 @@ An API for Evergreen built on Javascript and Cloudflare Workers with hybrid cach
 - **Security Focused**: Regular security audits and dependency updates
 - **Production Ready**: Robust error handling and monitoring
 
+## API Requirements
+
+- Public endpoints do not require authentication.
+- Every request must include a custom `User-Agent` header such as `YourCompany/Location` or `MyOrg/CloudOps`.
+- Requests without a valid `User-Agent` return a `400` JSON error response.
+- The `/health` endpoint includes additional diagnostics for cache and KV status.
+
 ## 🔧 Architecture
 
 ### Caching Strategy

@@ -4,12 +4,19 @@ This directory contains the OpenAPI v3 specification for the Evergreen API.
 
 ## Files
 
-- `openapi.yml` - Complete OpenAPI v3.0 specification with all endpoints, schemas, and examples
-- `swagger.yml` - Legacy Swagger specification (for compatibility)
+- `openapi.yml` - Complete OpenAPI v3.0 specification with all endpoints, schemas, and examples used by the API
+- This directory is intentionally focused on the current OpenAPI document; no separate legacy Swagger file is maintained in this repository
 
 ## API Overview
 
 The Evergreen API provides programmatic access to the latest version information and download URLs for popular software applications. It's designed to help system administrators and IT professionals keep their software up-to-date.
+
+### Request requirements
+
+- Authentication is not required for public endpoints.
+- Every request must include a valid `User-Agent` header in the format `company/location` or a similar descriptive pattern.
+- Missing or invalid `User-Agent` values return a `400` JSON error response.
+- The health endpoint returns additional diagnostic fields for cache and KV status, including `cache` and `kvTest` objects.
 
 ### Main Endpoints
 
