@@ -5,6 +5,9 @@ compatibility_date = "2022-05-30"
 account_id = "3f3a99ad15db52fca58be0e080912991"
 vars = { ENVIRONMENT = "production" }
 
+# Preserve dashboard-managed variables and secrets (e.g. API_TEST_USERAGENT) across deploys
+keep_vars = true
+
 # Enable observability features
 observability = { enabled = true }
 
