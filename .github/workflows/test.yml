@@ -311,7 +311,7 @@ jobs:
           for i in {1..5}; do
             echo "Request $i:"
             curl -w "Time: %{time_total}s, Status: %{http_code}\n" -o /dev/null -s \
-              -H "User-Agent: GitHub-Actions-Performance-Test/1.0.0" \
+              -H "User-Agent: $API_TEST_USERAGENT" \
               "https://evergreen-api.stealthpuppy.com/health"
           done
         env:

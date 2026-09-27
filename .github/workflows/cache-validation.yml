@@ -91,9 +91,11 @@ jobs:
             echo "Request $i:"
             curl -w "Time: %{time_total}s, Size: %{size_download} bytes\n" \
               -o /dev/null -s \
-              -H "User-Agent: GitHub-Actions-Performance-Test/1.0.0" \
+              -H "User-Agent: $API_TEST_USERAGENT" \
               "https://evergreen-api.stealthpuppy.com/apps"
           done
+        env:
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
 
       - name: Validate memory cache TTL
         run: |
