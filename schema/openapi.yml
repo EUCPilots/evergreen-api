@@ -10,7 +10,7 @@ info:
     No authentication is required, but all requests must include a custom User-Agent header for identification and tracking purposes.
     
     ## User-Agent Requirement
-    All API requests must include a custom User-Agent header following the format "company/location" or similar descriptive pattern.
+    All API requests must include a custom User-Agent header following the format "Application/Version (Company/URL)" or similar descriptive pattern.
     Examples: "ACME-Corp/NewYork", "TechServices/CloudOps", "PersonalProject/HomeOffice"
   version: "1.6.0"
   contact:
@@ -183,7 +183,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                message: "Invalid or missing User-Agent header. Please provide a custom User-Agent in the format 'company/location'."
+                message: "Invalid or missing User-Agent header. Please provide a custom User-Agent in the format 'Application/Version (Company/URL)'."
                 documentation: "https://eucpilots.com/evergreen/api/"
 
   /endpoints:
@@ -286,14 +286,14 @@ components:
       required: true
       description: |
         Custom user agent string for identification and tracking purposes.
-        Should follow the format "company/location" or similar descriptive pattern.
+        Should follow the format "Application/Version (Company/URL)" or similar descriptive pattern.
         This helps identify the source of API requests for analytics and support purposes.
       schema:
         type: string
         pattern: '^[A-Za-z0-9][A-Za-z0-9\-._/:;(),\s]*[A-Za-z0-9)]$'
         minLength: 3
         maxLength: 100
-        example: "company/location"
+        example: "Application/Version (Company/URL)"
       examples:
         corporate:
           summary: Corporate usage
@@ -548,7 +548,7 @@ components:
             invalidUserAgent:
               summary: Invalid or missing User-Agent header
               value:
-                message: "Invalid or missing User-Agent header. Please provide a custom User-Agent in the format 'company/location'."
+                message: "Invalid or missing User-Agent header. Please provide a custom User-Agent in the format 'Application/Version (Company/URL)'."
                 documentation: "https://eucpilots.com/evergreen/api/"
 
     ApplicationNotFoundError:
