@@ -30,6 +30,7 @@ jobs:
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_EVERGREENDASHBOARD_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           CF_DATASET: evergreen_requests
           API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
         run: node build.mjs
