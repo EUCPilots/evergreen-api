@@ -260,6 +260,15 @@ async function fetchBlockedSecurityEvents() {
   return groups.reduce((total, group) => total + Number(group.count || 0), 0)
 }
 
+async function fetchOptionalBlockedSecurityEvents() {
+  try {
+    return await fetchBlockedSecurityEvents()
+  } catch (error) {
+    console.warn(`Blocked security events are unavailable: ${error.message}`)
+    return null
+  }
+}
+
 async function fetchOrganizations(connectingIps) {
   if (connectingIps.length === 0) return []
 
@@ -288,7 +297,7 @@ async function main() {
   }))
   const data = Object.fromEntries(entries)
   const summary = data.summary[0] || { totalRequests: 0, uniqueConnectingIps: 0 }
-  const blockedSecurityEventsLast24Hours = await fetchBlockedSecurityEvents()
+  const blockedSecurityEventsLast24Hours = await fetchOptionalBlockedSecurityEvents()
 
   const repeatIps = data.connectingIps.map(row => row.connectingIp)
   data.organizations = await fetchOrganizations(repeatIps)
