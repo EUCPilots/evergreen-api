@@ -14,12 +14,10 @@
         "**/node_modules": true,
         "**/.git": true,
         "**/.DS_Store": true,
-        "**/dist": true,
         "**/.wrangler": true
     },
     "search.exclude": {
         "**/node_modules": true,
-        "**/dist": true,
         "**/.wrangler": true
     },
     "typescript.preferences.includePackageJsonAutoImports": "auto",
