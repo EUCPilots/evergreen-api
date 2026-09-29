@@ -295,6 +295,10 @@ async function init() {
   const oneTimeIps = (Number(data.summary?.uniqueConnectingIps) || 0) - (data.connectingIps?.length || 0)
   document.getElementById('one-time-ips').textContent = numberFormat.format(Math.max(oneTimeIps, 0))
   document.getElementById('burst-count').textContent = numberFormat.format(data.bursts?.length || 0)
+  const blockedSecurityEvents = data.blockedSecurityEventsLast24Hours
+  document.getElementById('blocked-security-events').textContent = blockedSecurityEvents == null
+    ? 'Unavailable'
+    : numberFormat.format(blockedSecurityEvents)
 
   document.getElementById('meta').textContent =
     `Last ${data.lookbackDays} days · updated ${new Date(data.generatedAt).toLocaleString()}`

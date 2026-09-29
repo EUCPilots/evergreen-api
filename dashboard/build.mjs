@@ -1,6 +1,7 @@
 // Queries the Workers Analytics Engine SQL API and generates dashboard/dist/data.json
 const CF_API_TOKEN = process.env.CF_API_TOKEN
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID
+const CF_ZONE_ID = process.env.CF_ZONE_ID || ''
 const CF_DATASET = process.env.CF_DATASET || 'evergreen_requests'
 const LOOKBACK_DAYS = process.env.LOOKBACK_DAYS || '30'
 const BURST_WINDOW_MINUTES = process.env.BURST_WINDOW_MINUTES || '15'
@@ -17,6 +18,7 @@ if (!CF_API_TOKEN || !CF_ACCOUNT_ID) {
 }
 
 const SQL_API_URL = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`
+const GRAPHQL_API_URL = 'https://api.cloudflare.com/client/v4/graphql'
 
 const lookbackDays = parsePositiveInteger('LOOKBACK_DAYS', LOOKBACK_DAYS)
 const burstWindowMinutes = parsePositiveInteger('BURST_WINDOW_MINUTES', BURST_WINDOW_MINUTES)
@@ -216,6 +218,48 @@ async function runQuery(sql, name = 'query') {
   throw lastError
 }
 
+async function fetchBlockedSecurityEvents() {
+  if (!CF_ZONE_ID) return null
+
+  const now = new Date()
+  const query = `query BlockedSecurityEvents($zoneTag: String!, $filter: FirewallEventsAdaptiveFilter_InputObject!) {
+    viewer {
+      zones(filter: { zoneTag: $zoneTag }) {
+        firewallEventsAdaptiveGroups(limit: 1, filter: $filter) {
+          count
+          dimensions { action }
+        }
+      }
+    }
+  }`
+  const response = await fetch(GRAPHQL_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CF_API_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      query,
+      variables: {
+        zoneTag: CF_ZONE_ID,
+        filter: {
+          datetime_geq: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+          datetime_leq: now.toISOString(),
+          action: 'block'
+        }
+      }
+    })
+  })
+
+  const result = await response.json()
+  if (!response.ok || result.errors?.length) {
+    throw new Error(`Cloudflare security events query failed: ${JSON.stringify(result.errors || result)}`)
+  }
+
+  const groups = result.data?.viewer?.zones?.[0]?.firewallEventsAdaptiveGroups || []
+  return groups.reduce((total, group) => total + Number(group.count || 0), 0)
+}
+
 async function fetchOrganizations(connectingIps) {
   if (connectingIps.length === 0) return []
 
@@ -244,6 +288,7 @@ async function main() {
   }))
   const data = Object.fromEntries(entries)
   const summary = data.summary[0] || { totalRequests: 0, uniqueConnectingIps: 0 }
+  const blockedSecurityEventsLast24Hours = await fetchBlockedSecurityEvents()
 
   const repeatIps = data.connectingIps.map(row => row.connectingIp)
   data.organizations = await fetchOrganizations(repeatIps)
@@ -257,6 +302,7 @@ async function main() {
     pathDiversityThreshold,
     halfLookbackDays,
     summary,
+    blockedSecurityEventsLast24Hours,
     connectingIps: data.connectingIps,
     paths: data.paths,
     locations: data.locations,

@@ -24,7 +24,7 @@
     h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); margin: 0; letter-spacing: 0; }
     #meta { color: var(--muted); margin: .35rem 0 0; }
     .status { color: var(--accent); background: var(--accent-soft); border-radius: 4px; font-size: .8rem; font-weight: 700; padding: .35rem .6rem; white-space: nowrap; }
-    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 1.5rem 0; }
+    .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 1.5rem 0; }
     .stat { background: #fff; padding: 1rem 1.2rem; }
     .stat:hover, .jump-links:hover, .notice:hover { background-color: var(--accent-soft); }
     .stat span { color: var(--muted); display: block; font-size: .78rem; font-weight: 700; text-transform: uppercase; }
@@ -89,11 +89,12 @@
       <span class="status">Successful GET requests</span>
     </header>
 
-    <section class="stats" aria-label="Request summary">
+    <section class="stats" aria-label="Request and security summary">
       <div class="stat"><span>Total requests</span><strong id="total-requests">&mdash;</strong></div>
       <div class="stat"><span>Connecting IPs</span><strong id="unique-ips">&mdash;</strong></div>
       <div class="stat"><span>One-time IPs</span><strong id="one-time-ips" title="Estimated from the top 500 repeat IPs; may undercount repeats beyond that.">&mdash;</strong></div>
       <div class="stat"><span>Flagged bursts</span><strong id="burst-count">&mdash;</strong></div>
+      <div class="stat"><span title="Cloudflare firewall events with action block; one request may generate multiple events.">Blocked security events (24h)</span><strong id="blocked-security-events">&mdash;</strong></div>
     </section>
 
     <div class="controls">
