@@ -224,13 +224,14 @@ async function fetchOrganizations(connectingIps) {
   const counts = new Map()
   for (const result of results) {
     for (const row of result.data || []) {
-      counts.set(row.asOrganization, (counts.get(row.asOrganization) || 0) + row.count)
+      const currentCount = Number(counts.get(row.asOrganization) || 0)
+      counts.set(row.asOrganization, currentCount + Number(row.count))
     }
   }
 
   return Array.from(counts, ([asOrganization, count]) => ({ asOrganization, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 500)
+    .slice(0, 25)
 }
 
 async function main() {

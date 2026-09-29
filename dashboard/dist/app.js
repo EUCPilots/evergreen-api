@@ -6,7 +6,7 @@ const state = {
   sort: {}
 }
 
-const MIN_ROW_VALUE = 3
+const MIN_ROW_VALUE = 5
 const numberFormat = new Intl.NumberFormat()
 const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 })
 
