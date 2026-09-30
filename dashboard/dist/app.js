@@ -9,13 +9,18 @@ const state = {
 const MIN_ROW_VALUE = 5
 const numberFormat = new Intl.NumberFormat()
 const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 })
+const utcDateFormat = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' })
+
+function formatShare(share) {
+  return share > 0 && share < 0.001 ? '<0.1%' : percentFormat.format(share)
+}
 
 const TABLES = {
   paths: {
     file: 'requests-by-path',
     columns: [
       { key: 'path', label: 'Path' },
-      { key: 'count', label: 'Share', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -23,7 +28,7 @@ const TABLES = {
     file: 'requests-by-connecting-ip',
     columns: [
       { key: 'connectingIp', label: 'Connecting IP' },
-      { key: 'count', label: 'Share', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -32,7 +37,7 @@ const TABLES = {
     columns: [
       { key: 'country', label: 'Country', fallback: 'Unknown', width: '11rem' },
       { key: 'region', label: 'Region', fallback: 'Unknown' },
-      { key: 'count', label: 'Share', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -40,7 +45,7 @@ const TABLES = {
     file: 'network-organizations',
     columns: [
       { key: 'asOrganization', label: 'AS organization' },
-      { key: 'count', label: 'Share', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -48,7 +53,7 @@ const TABLES = {
     file: 'user-agents',
     columns: [
       { key: 'userAgent', label: 'User agent' },
-      { key: 'count', label: 'Share', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -76,7 +81,7 @@ const TABLES = {
     columns: [
       { key: 'family', label: 'Client family' },
       { key: 'variants', label: 'Variants', type: 'count', width: '9rem' },
-      { key: 'count', label: 'Share', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -189,7 +194,7 @@ function renderTable(name) {
     ? rows.map(row => `<tr>${columns.map(column => {
         if (column.type === 'share') {
           const share = total ? (Number(row[column.key]) || 0) / total : 0
-          return `<td class="count"><span class="meter"><span style="width:${Math.min(share * 100, 100)}%"></span></span>${percentFormat.format(share)}</td>`
+          return `<td class="count"><span class="meter"><span style="width:${Math.min(share * 100, 100)}%"></span></span>${formatShare(share)}</td>`
         }
         if (column.type === 'trendDelta') {
           const { delta } = trendDelta(row)
@@ -241,6 +246,76 @@ function groupBurstsByIp(rows) {
   })).sort((left, right) => right.requests - left.requests)
 }
 
+function utcDay(value) {
+  return utcDateFormat.format(new Date(`${String(value).slice(0, 10)}T00:00:00Z`))
+}
+
+function renderDailyChart() {
+  const container = document.getElementById('daily-chart')
+  const rows = state.data.trend || []
+  if (!rows.length) {
+    container.textContent = 'No daily traffic data available.'
+    return
+  }
+  const maxRequests = Math.max(1, ...rows.map(row => Number(row.count) || 0))
+  const maxIps = Math.max(1, ...rows.map(row => Number(row.uniqueConnectingIps) || 0))
+  const generatedDay = state.data.generatedAt?.slice(0, 10)
+  container.innerHTML = `<div class="chart-legend"><span class="requests-key">Requests</span><span class="ips-key">Unique IPs</span><span>Separate scales per series · UTC days</span></div>` +
+    `<div class="daily-bars">${rows.map(row => {
+      const requests = Number(row.count) || 0
+      const ips = Number(row.uniqueConnectingIps) || 0
+      const current = String(row.day).slice(0, 10) === generatedDay
+      return `<div class="daily-bar"><span class="daily-label">${escapeHtml(utcDay(row.day))}${current ? ' · in progress' : ''}</span>` +
+        `<div class="bar-pair"><span class="bar-track"><span class="request-bar" style="width:${requests / maxRequests * 100}%"></span></span>` +
+        `<span class="bar-track"><span class="ip-bar" style="width:${ips / maxIps * 100}%"></span></span></div>` +
+        `<span class="daily-values">${numberFormat.format(requests)} / ${numberFormat.format(ips)}</span></div>`
+    }).join('')}</div>`
+}
+
+function renderTopPaths() {
+  const container = document.getElementById('top-paths')
+  const rows = applyFilter((state.data.paths || []).filter(row => meetsMinimumValue('paths', row)))
+    .slice().sort((a, b) => Number(b.count) - Number(a.count)).slice(0, 5)
+  const total = Number(state.data.summary?.totalRequests) || 0
+  if (!rows.length || !total) {
+    container.textContent = 'No matching paths.'
+    return
+  }
+  container.innerHTML = `<h3>Top paths</h3><div class="top-path-list">${rows.map(row => {
+    const count = Number(row.count) || 0
+    return `<div class="top-path"><span title="${escapeHtml(row.path)}">${escapeHtml(row.path)}</span>` +
+      `<span class="bar-track"><span class="request-bar" style="width:${Math.min(count / total * 100, 100)}%"></span></span>` +
+      `<strong>${formatShare(count / total)}</strong><small>${numberFormat.format(count)}</small></div>`
+  }).join('')}</div><p>Percent of all ${numberFormat.format(total)} requests; the table below lists up to 500 paths.</p>`
+}
+
+function renderCoverage() {
+  const data = state.data
+  const first = data.trend?.[0]?.day
+  const last = data.trend?.at(-1)?.day
+  const period = first && last ? `${utcDay(first)} to ${utcDay(last)} UTC` : 'No observed days'
+  document.getElementById('meta').textContent =
+    `Observed ${period} · requested last ${data.lookbackDays} days · updated ${new Date(data.generatedAt).toLocaleString()}`
+
+  const trendingRows = data.trending || data.trendingPaths || []
+  const earlier = trendingRows.reduce((sum, row) => sum + (Number(row.earlierCount) || 0), 0)
+  const recent = trendingRows.reduce((sum, row) => sum + (Number(row.recentCount) || 0), 0)
+  const available = earlier > 0 && recent > 0
+  document.getElementById('trending-section').hidden = !available
+  document.getElementById('trending-link').hidden = !available
+  document.getElementById('trending-unavailable').hidden = available
+  const note = document.getElementById('coverage-note')
+  note.textContent = `Tables show up to 500 rows per category. IPs and user agents omit empty values; network organizations cover only the top 500 repeat IPs with known organizations and show the top 25 results. Shares use all requests as the denominator, so displayed rows may not sum to 100%.`
+}
+
+function renderDiversityHighlight() {
+  const top = (state.data.pathDiversity || []).slice().sort((a, b) => Number(b.distinctPaths) - Number(a.distinctPaths))
+  const container = document.getElementById('diversity-highlight')
+  container.textContent = top.length > 1
+    ? `Highest path diversity: ${top[0].connectingIp} requested ${numberFormat.format(Number(top[0].distinctPaths))} distinct paths; next highest: ${numberFormat.format(Number(top[1].distinctPaths))}. Diversity alone does not establish abuse.`
+    : ''
+}
+
 function renderBurstGroups() {
   const container = document.getElementById('burst-groups')
   if (!container) return
@@ -269,19 +344,23 @@ function renderBurstGroups() {
       `<summary><div class="burst-group-summary">` +
       `<div class="burst-identity"><strong>${escapeHtml(group.connectingIp)}</strong><span title="${escapeHtml(group.organization)}">${escapeHtml(group.organization)}</span></div>` +
       `<div class="burst-activity" title="${numberFormat.format(group.requests)} requests"><span style="width:${activityWidth}%"></span></div>` +
-      `<div class="burst-metric"><strong>${numberFormat.format(group.requests)}</strong><span>requests</span></div>` +
+      `<div class="burst-metric"><strong>${numberFormat.format(group.requests)}</strong><span>flagged requests</span></div>` +
       `<div class="burst-metric"><strong>${numberFormat.format(group.windows.size)}</strong><span>windows</span></div>` +
       `<div class="burst-metric"><strong>${numberFormat.format(group.paths.size)}</strong><span>paths</span></div>` +
-      `<div class="burst-metric"><strong>${numberFormat.format(group.peak)}</strong><span>peak</span></div>` +
+      `<div class="burst-metric"><strong>${numberFormat.format(group.peak)}</strong><span>peak per record</span></div>` +
       `</div></summary><div class="burst-window-list">${windows}</div></details>`
   }).join('')
 
-  container.innerHTML = `<div class="burst-overview-header"><h3>Burst activity by connecting IP</h3><span>${numberFormat.format(groups.length)} IPs, ranked by flagged requests</span></div>` +
+  const ranking = `<div class="burst-ranking"><h3>IPs with most flagged requests</h3>${groups.slice(0, 5).map(group =>
+    `<div><strong>${escapeHtml(group.connectingIp)}</strong><span>${numberFormat.format(group.requests)} flagged requests</span><span>${numberFormat.format(group.windows.size)} windows</span><span>${numberFormat.format(group.paths.size)} paths</span><span>peak ${numberFormat.format(group.peak)} per record</span></div>`
+  ).join('')}</div>`
+  container.innerHTML = ranking + `<div class="burst-overview-header"><h3>Burst activity by connecting IP</h3><span>${numberFormat.format(groups.length)} IPs, ranked by flagged requests</span></div>` +
     `<div class="burst-group-list">${content}</div>`
 }
 
 function render() {
   Object.keys(TABLES).forEach(renderTable)
+  renderTopPaths()
   renderBurstGroups()
 }
 
@@ -373,12 +452,13 @@ async function init() {
   document.getElementById('one-time-ips').textContent = numberFormat.format(Math.max(oneTimeIps, 0))
   document.getElementById('burst-count').textContent = numberFormat.format(data.bursts?.length || 0)
 
-  document.getElementById('meta').textContent =
-    `Last ${data.lookbackDays} days · updated ${new Date(data.generatedAt).toLocaleString()}`
+  renderCoverage()
+  renderDailyChart()
+  renderDiversityHighlight()
   document.getElementById('burst-notice').innerHTML =
     `<strong>Review signal:</strong> ${numberFormat.format(data.burstRequestThreshold)} or more requests from the same IP to the same path with the same user agent within ${numberFormat.format(data.burstWindowMinutes)} minutes. A flagged window is an indicator for investigation, not proof of abuse.`
   document.getElementById('path-diversity-notice').innerHTML =
-    `<strong>Review signal:</strong> an IP requesting ${numberFormat.format(data.pathDiversityThreshold)} or more distinct app paths within the lookback window. This can indicate scanning or enumeration, independent of total request volume.`
+    `<strong>Review signal:</strong> an IP requesting ${numberFormat.format(data.pathDiversityThreshold)} or more distinct paths within the lookback window. This can indicate scanning or enumeration, independent of total request volume.`
 
   document.getElementById('filter').addEventListener('input', event => {
     state.filter = event.target.value
