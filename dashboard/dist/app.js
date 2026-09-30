@@ -204,8 +204,85 @@ function renderTable(name) {
   figure.innerHTML = `<table><colgroup>${cols}</colgroup><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
 }
 
+function groupBurstsByIp(rows) {
+  const groups = new Map()
+
+  for (const row of rows) {
+    const connectingIp = String(row.connectingIp || 'Unknown')
+    let group = groups.get(connectingIp)
+    if (!group) {
+      group = {
+        connectingIp,
+        requests: 0,
+        peak: 0,
+        windows: new Set(),
+        paths: new Set(),
+        userAgents: new Set(),
+        organizations: new Map(),
+        rows: []
+      }
+      groups.set(connectingIp, group)
+    }
+
+    const count = Number(row.count) || 0
+    const organization = String(row.asOrganization || 'Unknown')
+    group.requests += count
+    group.peak = Math.max(group.peak, count)
+    group.windows.add(row.windowStart)
+    group.paths.add(row.path)
+    group.userAgents.add(row.userAgent)
+    group.organizations.set(organization, (group.organizations.get(organization) || 0) + count)
+    group.rows.push(row)
+  }
+
+  return Array.from(groups.values()).map(group => ({
+    ...group,
+    organization: Array.from(group.organizations.entries()).sort((left, right) => right[1] - left[1])[0]?.[0] || 'Unknown'
+  })).sort((left, right) => right.requests - left.requests)
+}
+
+function renderBurstGroups() {
+  const container = document.getElementById('burst-groups')
+  if (!container) return
+
+  const groups = groupBurstsByIp(visibleRows('bursts'))
+  if (!groups.length) {
+    container.innerHTML = '<div class="burst-group-list"><div class="empty">No matching burst activity</div></div>'
+    return
+  }
+
+  const maximumRequests = groups[0].requests || 1
+  const content = groups.map((group, index) => {
+    const activityWidth = Math.max((group.requests / maximumRequests) * 100, 1)
+    const windows = group.rows.slice().sort((left, right) => String(right.windowStart).localeCompare(String(left.windowStart)))
+      .map(row => {
+        const timestamp = cellText(TABLES.bursts.columns[0], row)
+        return `<div class="burst-window">` +
+          `<span title="${escapeHtml(timestamp)}">${escapeHtml(timestamp)}</span>` +
+          `<span title="${escapeHtml(row.path)}">${escapeHtml(row.path)}</span>` +
+          `<span title="${escapeHtml(row.userAgent)}">${escapeHtml(row.userAgent)}</span>` +
+          `<span class="burst-window-count">${numberFormat.format(Number(row.count) || 0)}</span>` +
+          `</div>`
+      }).join('')
+
+    return `<details class="burst-group"${index === 0 ? ' open' : ''}>` +
+      `<summary><div class="burst-group-summary">` +
+      `<div class="burst-identity"><strong>${escapeHtml(group.connectingIp)}</strong><span title="${escapeHtml(group.organization)}">${escapeHtml(group.organization)}</span></div>` +
+      `<div class="burst-activity" title="${numberFormat.format(group.requests)} requests"><span style="width:${activityWidth}%"></span></div>` +
+      `<div class="burst-metric"><strong>${numberFormat.format(group.requests)}</strong><span>requests</span></div>` +
+      `<div class="burst-metric"><strong>${numberFormat.format(group.windows.size)}</strong><span>windows</span></div>` +
+      `<div class="burst-metric"><strong>${numberFormat.format(group.paths.size)}</strong><span>paths</span></div>` +
+      `<div class="burst-metric"><strong>${numberFormat.format(group.peak)}</strong><span>peak</span></div>` +
+      `</div></summary><div class="burst-window-list">${windows}</div></details>`
+  }).join('')
+
+  container.innerHTML = `<div class="burst-overview-header"><h3>Burst activity by connecting IP</h3><span>${numberFormat.format(groups.length)} IPs, ranked by flagged requests</span></div>` +
+    `<div class="burst-group-list">${content}</div>`
+}
+
 function render() {
   Object.keys(TABLES).forEach(renderTable)
+  renderBurstGroups()
 }
 
 function csvValue(value) {

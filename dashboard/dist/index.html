@@ -65,6 +65,31 @@
     .meter > span { background: var(--accent); display: block; height: 100%; }
     .notice { background: var(--warning-soft); border-left: 3px solid var(--warning); color: #6f3217; padding: .8rem 1rem; margin-bottom: 1rem; }
     .notice strong { color: inherit; }
+    .burst-overview { margin-bottom: 1rem; }
+    .burst-overview-header { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin-bottom: .55rem; }
+    .burst-overview-header h3 { font-size: .9rem; margin: 0; }
+    .burst-overview-header span { color: var(--muted); font-size: .78rem; }
+    .burst-group-list { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+    .burst-group + .burst-group { border-top: 1px solid var(--line); }
+    .burst-group summary { cursor: pointer; list-style-position: outside; padding: .85rem 1rem; }
+    .burst-group summary:hover { background: var(--accent-soft); }
+    .burst-group[open] summary { background: var(--surface); border-bottom: 1px solid var(--line); }
+    .burst-group-summary { align-items: center; display: grid; gap: .5rem 1.25rem; grid-template-columns: minmax(13rem, 1.5fr) minmax(8rem, 1fr) repeat(4, minmax(5rem, auto)); margin-left: .35rem; }
+    .burst-identity { min-width: 0; }
+    .burst-identity strong, .burst-identity span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .burst-identity strong { font-size: .88rem; }
+    .burst-identity span { color: var(--muted); font-size: .75rem; margin-top: .15rem; }
+    .burst-activity { background: var(--line); height: 7px; min-width: 5rem; }
+    .burst-activity span { background: var(--warning); display: block; height: 100%; }
+    .burst-metric { font-size: .75rem; text-align: right; white-space: nowrap; }
+    .burst-metric strong { display: block; font-size: .9rem; font-variant-numeric: tabular-nums; }
+    .burst-metric span { color: var(--muted); }
+    .burst-window-list { display: grid; }
+    .burst-window { align-items: center; display: grid; gap: .5rem 1rem; grid-template-columns: 11rem minmax(10rem, 1fr) minmax(12rem, 1.5fr) 5rem; padding: .55rem 1rem .55rem 2rem; }
+    .burst-window + .burst-window { border-top: 1px solid var(--line); }
+    .burst-window:hover { background: var(--accent-soft); }
+    .burst-window span { font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .burst-window .burst-window-count { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
     .empty { color: var(--muted); padding: 2rem; text-align: center; }
     .trend-up { color: var(--accent); }
     .trend-down { color: var(--warning); }
@@ -75,6 +100,12 @@
       .tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
       #filter { max-width: none; }
       .section-heading { align-items: start; flex-direction: column; }
+      .burst-overview-header { align-items: start; flex-direction: column; gap: .2rem; }
+      .burst-group-summary { grid-template-columns: minmax(0, 1fr) repeat(2, auto); }
+      .burst-activity { grid-column: 1 / -1; grid-row: 2; }
+      .burst-metric:nth-last-child(-n+2) { display: none; }
+      .burst-window { grid-template-columns: 1fr auto; padding-left: 1rem; }
+      .burst-window span:nth-child(3) { display: none; }
     }
   </style>
 </head>
@@ -153,6 +184,7 @@
         <a href="#table-pathDiversity">IPs requesting many distinct paths</a>
       </nav>
       <div class="section-heading" id="table-bursts" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
+      <div id="burst-groups" class="burst-overview" aria-live="polite"></div>
       <figure data-table="bursts"></figure>
       <div class="section-heading" id="table-pathDiversity" data-table="pathDiversity"><div class="heading-text"><h2>IPs requesting many distinct paths</h2><p>Possible scanning behavior, independent of request volume</p></div></div>
       <figure data-table="pathDiversity"></figure>
