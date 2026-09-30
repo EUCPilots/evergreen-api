@@ -351,10 +351,7 @@ function renderBurstGroups() {
       `</div></summary><div class="burst-window-list">${windows}</div></details>`
   }).join('')
 
-  const ranking = `<div class="burst-ranking"><h3>IPs with most flagged requests</h3>${groups.slice(0, 5).map(group =>
-    `<div><strong>${escapeHtml(group.connectingIp)}</strong><span>${numberFormat.format(group.requests)} flagged requests</span><span>${numberFormat.format(group.windows.size)} windows</span><span>${numberFormat.format(group.paths.size)} paths</span><span>peak ${numberFormat.format(group.peak)} per record</span></div>`
-  ).join('')}</div>`
-  container.innerHTML = ranking + `<div class="burst-overview-header"><h3>Burst activity by connecting IP</h3><span>${numberFormat.format(groups.length)} IPs, ranked by flagged requests</span></div>` +
+  container.innerHTML = `<div class="burst-overview-header"><h3>Burst activity by connecting IP</h3><span>${numberFormat.format(groups.length)} IPs, ranked by flagged requests</span></div>` +
     `<div class="burst-group-list">${content}</div>`
 }
 

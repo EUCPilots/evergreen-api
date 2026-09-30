@@ -96,12 +96,13 @@
     #trending-section[hidden], #trending-link[hidden], #trending-unavailable[hidden] { display: none; }
     .coverage-note, .section-note { color: var(--muted); font-size: .82rem; margin: .5rem 0 1rem; }
     .overview { border-bottom: 1px solid var(--line); padding: .75rem 0 1rem; }
-    .overview h3, .burst-ranking h3 { font-size: .9rem; margin: 0 0 .8rem; }
+    .overview h3 { font-size: .9rem; margin: 0 0 .8rem; }
     .overview p { color: var(--muted); font-size: .78rem; margin: .8rem 0 0; }
     .chart-legend { color: var(--muted); display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; font-size: .75rem; margin-bottom: .85rem; }
     .chart-legend .requests-key::before, .chart-legend .ips-key::before { content: ''; display: inline-block; width: .7rem; height: .7rem; margin-right: .35rem; background: var(--accent); }
     .chart-legend .ips-key::before { background: var(--warning); }
-    .daily-bars, .top-path-list { display: grid; gap: .55rem; }
+    .daily-bars { display: grid; gap: 1rem; }
+    .top-path-list { display: grid; gap: .55rem; }
     .daily-bar { display: grid; grid-template-columns: 11rem minmax(5rem, 1fr) 9rem; gap: .8rem; align-items: center; font-size: .78rem; }
     .daily-label { white-space: nowrap; }
     .daily-values { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -113,10 +114,6 @@
     .top-path { display: grid; grid-template-columns: minmax(9rem, 1.5fr) minmax(5rem, 1fr) 3.5rem 4rem; align-items: center; gap: .7rem; font-size: .78rem; }
     .top-path > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .top-path strong, .top-path small { font-variant-numeric: tabular-nums; text-align: right; }
-    .burst-ranking { margin-bottom: 1.3rem; }
-    .burst-ranking > div { display: flex; flex-wrap: wrap; gap: .25rem 1rem; border-bottom: 1px solid var(--line); padding: .5rem 0; font-size: .78rem; }
-    .burst-ranking > div > strong { min-width: 10rem; }
-    .burst-ranking > div > span { font-variant-numeric: tabular-nums; }
     @media (max-width: 700px) {
       main.container { padding-top: 1rem; }
       .masthead, .controls { align-items: stretch; flex-direction: column; }
@@ -179,7 +176,6 @@
       </nav>
       <div class="section-heading" id="table-trend" data-table="trend"><div class="heading-text"><h2>Daily traffic trend</h2><p>Overall requests and unique connecting IPs per day, independent of the filter</p></div></div>
       <div id="daily-chart" class="overview" role="img" aria-label="Daily requests and unique connecting IPs, with values per day"></div>
-      <figure data-table="trend"></figure>
       <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
       <div id="top-paths" class="overview"></div>
       <figure data-table="paths"></figure>
