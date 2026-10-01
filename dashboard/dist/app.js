@@ -190,8 +190,11 @@ function renderTable(name) {
   }).join('')
 
   const rows = visibleRows(name)
+  const topPaths = name === 'paths'
+    ? new Set(rows.slice().sort((a, b) => Number(b.count) - Number(a.count)).slice(0, 5).map(row => row.path))
+    : null
   const body = rows.length
-    ? rows.map(row => `<tr>${columns.map(column => {
+    ? rows.map(row => `<tr${topPaths?.has(row.path) ? ' class="top-path-row"' : ''}>${columns.map(column => {
         if (column.type === 'share') {
           const share = total ? (Number(row[column.key]) || 0) / total : 0
           return `<td class="count"><span class="meter"><span style="width:${Math.min(share * 100, 100)}%"></span></span>${formatShare(share)}</td>`
@@ -272,23 +275,6 @@ function renderDailyChart() {
     }).join('')}</div>`
 }
 
-function renderTopPaths() {
-  const container = document.getElementById('top-paths')
-  const rows = applyFilter((state.data.paths || []).filter(row => meetsMinimumValue('paths', row)))
-    .slice().sort((a, b) => Number(b.count) - Number(a.count)).slice(0, 5)
-  const total = Number(state.data.summary?.totalRequests) || 0
-  if (!rows.length || !total) {
-    container.textContent = 'No matching paths.'
-    return
-  }
-  container.innerHTML = `<h3>Top paths</h3><div class="top-path-list">${rows.map(row => {
-    const count = Number(row.count) || 0
-    return `<div class="top-path"><span title="${escapeHtml(row.path)}">${escapeHtml(row.path)}</span>` +
-      `<span class="bar-track"><span class="request-bar" style="width:${Math.min(count / total * 100, 100)}%"></span></span>` +
-      `<strong>${formatShare(count / total)}</strong><small>${numberFormat.format(count)}</small></div>`
-  }).join('')}</div><p>Percent of all ${numberFormat.format(total)} requests; the table below lists up to 500 paths.</p>`
-}
-
 function renderCoverage() {
   const data = state.data
   const first = data.trend?.[0]?.day
@@ -357,7 +343,6 @@ function renderBurstGroups() {
 
 function render() {
   Object.keys(TABLES).forEach(renderTable)
-  renderTopPaths()
   renderBurstGroups()
 }
 

@@ -53,6 +53,7 @@
     table { font-size: .88rem; margin: 0; table-layout: fixed; width: 100%; min-width: 34rem; }
     th { background: var(--surface); color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
     td, th { padding: .65rem .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    tbody tr.top-path-row > * { background-color: var(--accent-soft); }
     tbody tr:hover > * { background-color: var(--accent-soft); }
     td.count, th.count { text-align: right; font-variant-numeric: tabular-nums; }
     th button.sort { background: transparent; border: 0; color: inherit; font: inherit; letter-spacing: inherit; margin: 0; padding: 0; text-transform: inherit; width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -102,7 +103,6 @@
     .chart-legend .requests-key::before, .chart-legend .ips-key::before { content: ''; display: inline-block; width: .7rem; height: .7rem; margin-right: .35rem; background: var(--accent); }
     .chart-legend .ips-key::before { background: var(--warning); }
     .daily-bars { display: grid; gap: 1rem; }
-    .top-path-list { display: grid; gap: .55rem; }
     .daily-bar { display: grid; grid-template-columns: 11rem minmax(5rem, 1fr) 9rem; gap: .8rem; align-items: center; font-size: .78rem; }
     .daily-label { white-space: nowrap; }
     .daily-values { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -111,9 +111,6 @@
     .bar-track > span { display: block; height: 100%; }
     .request-bar { background: var(--accent); }
     .ip-bar { background: var(--warning); }
-    .top-path { display: grid; grid-template-columns: minmax(9rem, 1.5fr) minmax(5rem, 1fr) 3.5rem 4rem; align-items: center; gap: .7rem; font-size: .78rem; }
-    .top-path > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .top-path strong, .top-path small { font-variant-numeric: tabular-nums; text-align: right; }
     @media (max-width: 700px) {
       main.container { padding-top: 1rem; }
       .masthead, .controls { align-items: stretch; flex-direction: column; }
@@ -176,8 +173,7 @@
       </nav>
       <div class="section-heading" id="table-trend" data-table="trend"><div class="heading-text"><h2>Daily traffic trend</h2><p>Overall requests and unique connecting IPs per day, independent of the filter</p></div></div>
       <div id="daily-chart" class="overview" role="img" aria-label="Daily requests and unique connecting IPs, with values per day"></div>
-      <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
-      <div id="top-paths" class="overview"></div>
+      <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used; top five rows highlighted</p></div></div>
       <figure data-table="paths"></figure>
       <p id="trending-unavailable" class="section-note" hidden>Trending paths unavailable: no requests were recorded in the earlier half of the requested window.</p>
       <div id="trending-section">
