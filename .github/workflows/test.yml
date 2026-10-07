@@ -56,7 +56,7 @@ jobs:
           npm test
         env:
           NODE_ENV: test
-          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT || 'evergreen-api-tests/github-actions' }}
 
       - name: Generate test report
         if: always()
@@ -65,7 +65,7 @@ jobs:
           npx mocha test.js --timeout 30000 --reporter json > test-results.json || true
           npx mocha test.js --timeout 30000 --reporter tap > test-results.tap || true
         env:
-          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT || 'evergreen-api-tests/github-actions' }}
 
       - name: Upload test results
         if: always()
@@ -315,7 +315,7 @@ jobs:
               "https://evergreen-api.stealthpuppy.com/health"
           done
         env:
-          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT }}
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT || 'evergreen-api-tests/github-actions' }}
 
   comment-pr:
     name: Comment Test Results
