@@ -26,7 +26,7 @@
     .status { color: var(--accent); background: var(--accent-soft); border-radius: 4px; font-size: .8rem; font-weight: 700; padding: .35rem .6rem; white-space: nowrap; }
     .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin: 1.5rem 0; }
     .stat { background: #fff; padding: 1rem 1.2rem; }
-    .stat:hover, .jump-links:hover, .notice:hover { background-color: var(--accent-soft); }
+    .stat:hover, .notice:hover { background-color: var(--accent-soft); }
     .stat span { color: var(--muted); display: block; font-size: .78rem; font-weight: 700; text-transform: uppercase; }
     .stat strong { display: block; font-size: 1.75rem; font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: .25rem; }
     .controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
@@ -38,9 +38,10 @@
     .row-threshold-toggle { background: transparent; border: 0; color: var(--accent); font-size: .85rem; margin: 0; padding: .5rem 0; white-space: nowrap; width: auto; }
     [role="tabpanel"][hidden] { display: none; }
     .section-heading { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin: 1.75rem 0 .6rem; scroll-margin-top: 1rem; }
-    .jump-links { border: 1px solid var(--line); border-radius: 6px; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin-bottom: 1rem; padding: .6rem .8rem; }
-    .jump-links span { color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-    .jump-links a { font-size: .82rem; }
+    .table-tabs { border-bottom: 1px solid var(--line); display: flex; gap: .25rem; overflow-x: auto; }
+    .table-tabs button { background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); flex: 0 0 auto; font-size: .82rem; margin: 0; padding: .65rem .8rem; white-space: nowrap; width: auto; }
+    .table-tabs button:hover { color: var(--accent); background: var(--accent-soft); }
+    .table-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); font-weight: 700; }
     .back-to-top { align-items: center; background: var(--ink); border: 1px solid var(--line); border-radius: 50%; bottom: 1rem; box-shadow: 0 2px 8px #17211b33; color: #fff; display: flex; font-size: 1.35rem; height: 2.75rem; justify-content: center; margin: 0; padding: 0; position: fixed; right: 1rem; width: 2.75rem; z-index: 10; }
     .back-to-top:hover { background: var(--accent); }
     .back-to-top[hidden] { display: none; }
@@ -154,8 +155,8 @@
     <div class="controls">
       <div class="tabs" role="tablist" aria-label="Dashboard views">
         <button type="button" role="tab" aria-selected="true" aria-controls="traffic-panel" id="traffic-tab">Traffic</button>
-        <button type="button" role="tab" aria-selected="false" aria-controls="audience-panel" id="audience-tab">Audience</button>
-        <button type="button" role="tab" aria-selected="false" aria-controls="abuse-panel" id="abuse-tab">Potential abuse</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="audience-panel" id="audience-tab" tabindex="-1">Audience</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="abuse-panel" id="abuse-tab" tabindex="-1">Potential abuse</button>
       </div>
       <div class="filter-actions">
         <input type="search" id="filter" aria-label="Filter the current view" placeholder="Filter current view&hellip;" />
@@ -164,58 +165,75 @@
     </div>
 
     <section id="traffic-panel" role="tabpanel" aria-labelledby="traffic-tab">
-      <nav class="jump-links" aria-label="Jump to a table in this view">
-        <span>Jump to</span>
-        <a href="#table-trend">Daily traffic trend</a>
-        <a href="#table-paths">Requests by path</a>
-        <a href="#table-trendingPaths" id="trending-link">Trending paths</a>
-        <a href="#table-connectingIps">Requests by connecting IP</a>
-      </nav>
+      <div class="table-tabs" role="tablist" aria-label="Traffic tables">
+        <button type="button" role="tab" id="trend-tab" aria-controls="trend-panel" aria-selected="true">Daily traffic trend</button>
+        <button type="button" role="tab" id="paths-tab" aria-controls="paths-panel" aria-selected="false" tabindex="-1">Requests by path</button>
+        <button type="button" role="tab" id="trendingPaths-tab" aria-controls="trendingPaths-panel" aria-selected="false" tabindex="-1">Trending paths</button>
+        <button type="button" role="tab" id="connectingIps-tab" aria-controls="connectingIps-panel" aria-selected="false" tabindex="-1">Requests by connecting IP</button>
+      </div>
+      <section id="trend-panel" role="tabpanel" aria-labelledby="trend-tab" tabindex="0">
       <div class="section-heading" id="table-trend" data-table="trend"><div class="heading-text"><h2>Daily traffic trend</h2><p>Overall requests and unique connecting IPs per day, independent of the filter</p></div></div>
       <div id="daily-chart" class="overview" role="img" aria-label="Daily requests and unique connecting IPs, with values per day"></div>
+      </section>
+      <section id="paths-panel" role="tabpanel" aria-labelledby="paths-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used; top five rows highlighted</p></div></div>
       <figure data-table="paths"></figure>
+      </section>
+      <section id="trendingPaths-panel" role="tabpanel" aria-labelledby="trendingPaths-tab" tabindex="0" hidden>
       <p id="trending-unavailable" class="section-note" hidden>Trending paths unavailable: no requests were recorded in the earlier half of the requested window.</p>
       <div id="trending-section">
         <div class="section-heading" id="table-trendingPaths" data-table="trendingPaths"><div class="heading-text"><h2>Trending paths</h2><p>Comparing the first and second half of the lookback window</p></div></div>
         <figure data-table="trendingPaths"></figure>
       </div>
+      </section>
+      <section id="connectingIps-panel" role="tabpanel" aria-labelledby="connectingIps-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-connectingIps" data-table="connectingIps"><div class="heading-text"><h2>Requests by connecting IP</h2><p>Who is making requests, independent of location metadata</p></div></div>
       <figure data-table="connectingIps"></figure>
+      </section>
     </section>
 
     <section id="audience-panel" role="tabpanel" aria-labelledby="audience-tab" hidden>
-      <nav class="jump-links" aria-label="Jump to a table in this view">
-        <span>Jump to</span>
-        <a href="#table-locations">Country and region</a>
-        <a href="#table-userAgents">User agents</a>
-        <a href="#table-clientFamilies">Client families</a>
-        <a href="#table-organizations">Network organizations</a>
-      </nav>
+      <div class="table-tabs" role="tablist" aria-label="Audience tables">
+        <button type="button" role="tab" id="locations-tab" aria-controls="locations-panel" aria-selected="true">Country and region</button>
+        <button type="button" role="tab" id="userAgents-tab" aria-controls="userAgents-panel" aria-selected="false" tabindex="-1">User agents</button>
+        <button type="button" role="tab" id="clientFamilies-tab" aria-controls="clientFamilies-panel" aria-selected="false" tabindex="-1">Client families</button>
+        <button type="button" role="tab" id="organizations-tab" aria-controls="organizations-panel" aria-selected="false" tabindex="-1">Network organizations</button>
+      </div>
+      <section id="locations-panel" role="tabpanel" aria-labelledby="locations-tab" tabindex="0">
       <div class="section-heading" id="table-locations" data-table="locations"><div class="heading-text"><h2>Country and region</h2><p>Where API traffic originates</p></div></div>
       <figure data-table="locations"></figure>
+      </section>
+      <section id="userAgents-panel" role="tabpanel" aria-labelledby="userAgents-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-userAgents" data-table="userAgents"><div class="heading-text"><h2>User agents</h2><p>Client identity that can persist across IP addresses and locations</p></div></div>
       <figure data-table="userAgents"></figure>
+      </section>
+      <section id="clientFamilies-panel" role="tabpanel" aria-labelledby="clientFamilies-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-clientFamilies" data-table="clientFamilies"><div class="heading-text"><h2>Client families</h2><p>User agents grouped by name, collapsing version/build suffixes</p></div></div>
       <figure data-table="clientFamilies"></figure>
+      </section>
+      <section id="organizations-panel" role="tabpanel" aria-labelledby="organizations-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-organizations" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>Top 25 known organizations among the top 500 repeat IPs</p></div></div>
       <figure data-table="organizations"></figure>
+      </section>
     </section>
 
     <section id="abuse-panel" role="tabpanel" aria-labelledby="abuse-tab" hidden>
+      <div class="table-tabs" role="tablist" aria-label="Potential abuse tables">
+        <button type="button" role="tab" id="bursts-tab" aria-controls="bursts-panel" aria-selected="true">High-volume request windows</button>
+        <button type="button" role="tab" id="pathDiversity-tab" aria-controls="pathDiversity-panel" aria-selected="false" tabindex="-1">IPs requesting many distinct paths</button>
+      </div>
+      <section id="bursts-panel" role="tabpanel" aria-labelledby="bursts-tab" tabindex="0">
       <div id="burst-notice" class="notice">Loading detection criteria&hellip;</div>
-      <div id="path-diversity-notice" class="notice">Loading detection criteria&hellip;</div>
-      <nav class="jump-links" aria-label="Jump to a table in this view">
-        <span>Jump to</span>
-        <a href="#table-bursts">High-volume request windows</a>
-        <a href="#table-pathDiversity">IPs requesting many distinct paths</a>
-      </nav>
       <div class="section-heading" id="table-bursts" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
       <div id="burst-groups" class="burst-overview" aria-live="polite"></div>
       <figure data-table="bursts"></figure>
+      </section>
+      <section id="pathDiversity-panel" role="tabpanel" aria-labelledby="pathDiversity-tab" tabindex="0" hidden>
+      <div id="path-diversity-notice" class="notice">Loading detection criteria&hellip;</div>
       <div class="section-heading" id="table-pathDiversity" data-table="pathDiversity"><div class="heading-text"><h2>IPs requesting many distinct paths</h2><p>Possible scanning behavior, independent of request volume</p></div></div>
       <p id="diversity-highlight" class="section-note"></p>
       <figure data-table="pathDiversity"></figure>
+      </section>
     </section>
 
   </main>
@@ -223,4 +241,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-

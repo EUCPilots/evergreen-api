@@ -1,6 +1,5 @@
 const state = {
   data: null,
-  activePanel: 'traffic-panel',
   filter: '',
   showLowVolumeRows: false,
   sort: {}
@@ -288,7 +287,6 @@ function renderCoverage() {
   const recent = trendingRows.reduce((sum, row) => sum + (Number(row.recentCount) || 0), 0)
   const available = earlier > 0 && recent > 0
   document.getElementById('trending-section').hidden = !available
-  document.getElementById('trending-link').hidden = !available
   document.getElementById('trending-unavailable').hidden = available
   const note = document.getElementById('coverage-note')
   note.textContent = `Tables show up to 500 rows per category. IPs and user agents omit empty values; network organizations cover only the top 500 repeat IPs with known organizations and show the top 25 results. Shares use all requests as the denominator, so displayed rows may not sum to 100%.`
@@ -419,8 +417,39 @@ function setupBackToTop() {
   })
 }
 
+function setupTabs() {
+  document.querySelectorAll('[role="tablist"]').forEach(tablist => {
+    const tabs = [...tablist.querySelectorAll('[role="tab"]')]
+    const activate = tab => {
+      tabs.forEach(item => {
+        const selected = item === tab
+        item.setAttribute('aria-selected', String(selected))
+        item.tabIndex = selected ? 0 : -1
+        document.getElementById(item.getAttribute('aria-controls')).hidden = !selected
+      })
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activate(tab))
+      tab.addEventListener('keydown', event => {
+        let nextIndex
+        if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length
+        else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length
+        else if (event.key === 'Home') nextIndex = 0
+        else if (event.key === 'End') nextIndex = tabs.length - 1
+        else return
+
+        event.preventDefault()
+        activate(tabs[nextIndex])
+        tabs[nextIndex].focus()
+      })
+    })
+  })
+}
+
 async function init() {
   setupBackToTop()
+  setupTabs()
 
   const res = await fetch('data.json', { cache: 'no-store' })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -453,14 +482,6 @@ async function init() {
     rowThresholdToggle.setAttribute('aria-pressed', String(state.showLowVolumeRows))
     rowThresholdToggle.textContent = state.showLowVolumeRows ? 'Hide rows under 5' : 'Show rows under 5'
     render()
-  })
-
-  document.querySelectorAll('[role="tab"]').forEach(tab => {
-    tab.addEventListener('click', () => {
-      state.activePanel = tab.getAttribute('aria-controls')
-      document.querySelectorAll('[role="tab"]').forEach(item => item.setAttribute('aria-selected', String(item === tab)))
-      document.querySelectorAll('[role="tabpanel"]').forEach(panel => { panel.hidden = panel.id !== state.activePanel })
-    })
   })
 
   data.paths ||= []

@@ -33,6 +33,12 @@ An API for Evergreen built on Javascript and Cloudflare Workers with hybrid cach
 - Performance metrics and response time monitoring
 - Automated health checks and diagnostics
 
+### Request intelligence dashboard
+
+The [dashboard](dashboard/dist/index.html) groups reports into Traffic, Audience, and Potential abuse views. Horizontal tabs show one report at a time and retain each view's selected report when switching views. On narrow screens, the report tabs scroll horizontally.
+
+Use Left/Right Arrow, Home, and End to navigate tabs. Filtering, the low-volume row toggle, sorting, and CSV export remain available for table reports; the daily traffic chart is independent of filtering.
+
 ## 📊 API Endpoints
 
 | Endpoint | Description | Cache TTL |
