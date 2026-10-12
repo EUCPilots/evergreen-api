@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Evergreen API | Request intelligence</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" />
   <style>
     :root {
       font-size: 95%;
@@ -17,7 +20,7 @@
       --warning: #a44318;
       --warning-soft: #fff0e8;
     }
-    body { color: var(--ink); background: #fff; }
+    body { color: var(--ink); background: #fff; font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     main.container { padding-top: 2rem; padding-bottom: 4rem; }
     .masthead { display: flex; align-items: end; justify-content: space-between; gap: 2rem; border-bottom: 1px solid var(--line); padding-bottom: 1.25rem; }
     .eyebrow { color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .25rem; }
@@ -35,7 +38,6 @@
     .tabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
     #filter { max-width: 25rem; margin: 0; }
     .filter-actions { display: flex; align-items: center; gap: .8rem; }
-    .row-threshold-toggle { background: transparent; border: 0; color: var(--accent); font-size: .85rem; margin: 0; padding: .5rem 0; white-space: nowrap; width: auto; }
     [role="tabpanel"][hidden] { display: none; }
     .section-heading { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin: 1.75rem 0 .6rem; scroll-margin-top: 1rem; }
     .table-tabs { border-bottom: 1px solid var(--line); display: flex; gap: .25rem; overflow-x: auto; }
@@ -147,7 +149,7 @@
     <section class="stats" aria-label="Request summary">
       <div class="stat"><span>Total requests</span><strong id="total-requests">&mdash;</strong></div>
       <div class="stat"><span>Connecting IPs</span><strong id="unique-ips">&mdash;</strong></div>
-      <div class="stat"><span>IPs outside top repeat list</span><strong id="one-time-ips" title="Unique IPs minus the top 500 repeat IPs; includes other repeat IPs, so this is not a one-time IP count.">&mdash;</strong></div>
+      <div class="stat"><span>IPs with one request</span><strong id="one-time-ips" title="Unique connecting IPs minus all connecting IPs with more than one request.">&mdash;</strong></div>
       <div class="stat"><span>Flagged burst records</span><strong id="burst-count" title="Rows grouped by time window, IP, path, user agent and organization; not a count of unique windows.">&mdash;</strong></div>
     </section>
 
@@ -161,7 +163,6 @@
       </div>
       <div class="filter-actions">
         <input type="search" id="filter" aria-label="Filter the current view" placeholder="Filter current view&hellip;" />
-        <button type="button" id="row-threshold-toggle" class="row-threshold-toggle" aria-pressed="false">Show rows under 5</button>
       </div>
     </div>
 
@@ -213,7 +214,7 @@
       <figure data-table="clientFamilies"></figure>
       </section>
       <section id="organizations-panel" role="tabpanel" aria-labelledby="organizations-tab" tabindex="0" hidden>
-      <div class="section-heading" id="table-organizations" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>Top 25 known organizations among the top 500 repeat IPs</p></div></div>
+      <div class="section-heading" id="table-organizations" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>Known organizations among all repeat IPs</p></div></div>
       <figure data-table="organizations"></figure>
       </section>
     </section>

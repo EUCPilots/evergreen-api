@@ -1,11 +1,9 @@
 const state = {
   data: null,
   filter: '',
-  showLowVolumeRows: false,
   sort: {}
 }
 
-const MIN_ROW_VALUE = 5
 const numberFormat = new Intl.NumberFormat()
 const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 })
 const utcDateFormat = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' })
@@ -86,7 +84,6 @@ const TABLES = {
   },
   pathDiversity: {
     file: 'ips-with-high-path-diversity',
-    minimumValueKeys: ['distinctPaths'],
     columns: [
       { key: 'connectingIp', label: 'Connecting IP', width: '11rem' },
       { key: 'asOrganization', label: 'Organization', fallback: 'Unknown' },
@@ -96,7 +93,6 @@ const TABLES = {
   },
   trendingPaths: {
     file: 'trending-paths',
-    minimumValueKeys: ['earlierCount', 'recentCount'],
     columns: [
       { key: 'path', label: 'Path' },
       { key: 'earlierCount', label: 'Earlier period', type: 'count', width: '11rem' },
@@ -148,14 +144,8 @@ function applyFilter(rows) {
   return rows.filter(row => Object.values(row).some(value => String(value ?? '').toLowerCase().includes(needle)))
 }
 
-function meetsMinimumValue(name, row) {
-  if (state.showLowVolumeRows) return true
-  const keys = TABLES[name].minimumValueKeys || ['count']
-  return keys.some(key => Number(row[key]) >= MIN_ROW_VALUE)
-}
-
 function visibleRows(name) {
-  const rows = applyFilter((state.data[name] || []).filter(row => meetsMinimumValue(name, row)))
+  const rows = applyFilter(state.data[name] || [])
   const sort = state.sort[name]
   if (!sort) return rows
   const column = TABLES[name].columns[sort.index]
@@ -289,7 +279,7 @@ function renderCoverage() {
   document.getElementById('trending-section').hidden = !available
   document.getElementById('trending-unavailable').hidden = available
   const note = document.getElementById('coverage-note')
-  note.textContent = `Tables show up to 500 rows per category. IPs and user agents omit empty values; network organizations cover only the top 500 repeat IPs with known organizations and show the top 25 results. Shares use all requests as the denominator, so displayed rows may not sum to 100%.`
+  note.textContent = `Tables show all returned rows. IPs and user agents omit empty values; network organizations include known organizations among repeat IPs. Shares use all requests as the denominator, so displayed rows may not sum to 100%.`
 }
 
 function renderDiversityHighlight() {
@@ -473,14 +463,6 @@ async function init() {
 
   document.getElementById('filter').addEventListener('input', event => {
     state.filter = event.target.value
-    render()
-  })
-
-  const rowThresholdToggle = document.getElementById('row-threshold-toggle')
-  rowThresholdToggle.addEventListener('click', () => {
-    state.showLowVolumeRows = !state.showLowVolumeRows
-    rowThresholdToggle.setAttribute('aria-pressed', String(state.showLowVolumeRows))
-    rowThresholdToggle.textContent = state.showLowVolumeRows ? 'Hide rows under 5' : 'Show rows under 5'
     render()
   })
 

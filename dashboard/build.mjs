@@ -56,8 +56,7 @@ function dimensionQuery(column, alias, where = `${column} != ''`) {
   return `SELECT ${column} AS ${alias}, SUM(_sample_interval) AS count
 ${recentData} AND ${where}
 GROUP BY ${column}
-ORDER BY count DESC
-LIMIT 500`
+ORDER BY count DESC`
 }
 
 function sqlStringLiteral(value) {
@@ -71,8 +70,7 @@ function organizationsQuery(connectingIps) {
 ${recentData} AND blob7 != ''
   AND blob6 IN (${inList})
 GROUP BY blob7
-ORDER BY count DESC
-LIMIT 500`
+ORDER BY count DESC`
 }
 
 // Analytics Engine SQL API rejects queries over 10000 chars, so the IN list is split into batches
@@ -111,14 +109,12 @@ ${recentData}`,
 ${recentData} AND blob6 != ''
 GROUP BY blob6
 HAVING count > 1
-ORDER BY count DESC
-LIMIT 500`,
+ORDER BY count DESC`,
   paths: dimensionQuery('blob1', 'path'),
   locations: `SELECT blob2 AS country, blob3 AS region, SUM(_sample_interval) AS count
 ${recentData} AND (blob2 != '' OR blob3 != '')
 GROUP BY blob2, blob3
-ORDER BY count DESC
-LIMIT 500`,
+ORDER BY count DESC`,
   userAgents: dimensionQuery('blob5', 'userAgent'),
   bursts: `SELECT
   toStartOfInterval(timestamp, INTERVAL '${burstWindowMinutes}' MINUTE) AS windowStart,
@@ -130,8 +126,7 @@ LIMIT 500`,
 ${recentData} AND blob6 != ''
 GROUP BY windowStart, blob6, blob1, blob5, blob7
 HAVING count >= ${burstRequestThreshold}
-ORDER BY count DESC
-LIMIT 500`,
+ORDER BY count DESC`,
   trend: `SELECT
   toStartOfDay(timestamp) AS day,
   SUM(_sample_interval) AS count,
@@ -146,8 +141,7 @@ ORDER BY day ASC`,
   COUNT(DISTINCT blob5) AS variants
 ${recentData} AND blob5 != ''
 GROUP BY family
-ORDER BY count DESC
-LIMIT 500`,
+ORDER BY count DESC`,
   pathDiversity: `SELECT
   blob6 AS connectingIp,
   argMax(blob7, _sample_interval) AS asOrganization,
@@ -156,8 +150,7 @@ LIMIT 500`,
 ${recentData} AND blob6 != ''
 GROUP BY blob6
 HAVING distinctPaths >= ${pathDiversityThreshold}
-ORDER BY distinctPaths DESC, count DESC
-LIMIT 500`,
+ORDER BY distinctPaths DESC, count DESC`,
   trending: `SELECT
   blob1 AS path,
   sumIf(_sample_interval, timestamp < NOW() - INTERVAL '${halfLookbackDays}' DAY) AS earlierCount,
@@ -165,8 +158,7 @@ LIMIT 500`,
 ${recentData}
 GROUP BY blob1
 HAVING earlierCount > 0 OR recentCount > 0
-ORDER BY recentCount DESC
-LIMIT 500`
+ORDER BY recentCount DESC`
 }
 
 const QUERY_RETRY_ATTEMPTS = 3
@@ -234,7 +226,6 @@ async function fetchOrganizations(connectingIps) {
 
   return Array.from(counts, ([asOrganization, count]) => ({ asOrganization, count }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 25)
 }
 
 async function main() {
