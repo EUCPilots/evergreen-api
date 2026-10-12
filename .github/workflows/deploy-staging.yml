@@ -1,0 +1,93 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/deploy-staging.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  STAGING_URL: https://evergreen-api-staging.stealthpuppy.workers.dev
+
+jobs:
+  deploy:
+    name: Deploy evergreen-api-staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ env.STAGING_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+          cache-dependency-path: src/package-lock.json
+
+      - name: Install worker dependencies
+        working-directory: src
+        run: npm ci
+
+      - name: Deploy worker to staging
+        working-directory: src
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: npx wrangler deploy --env staging --message "GitHub Actions ${{ github.sha }}"
+
+  test:
+    name: Run API Tests against Staging
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: npm ci
+
+      - name: Wait for staging to report the staging environment
+        env:
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT || 'evergreen-api-tests/github-actions' }}
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fsS -A "$API_TEST_USERAGENT" "$STAGING_URL/health" | grep -q '"environment":"staging"'; then
+              echo "✅ Staging worker is live"
+              exit 0
+            fi
+            echo "Waiting for staging worker... ($i/10)"
+            sleep 6
+          done
+          echo "❌ Staging worker did not become healthy"
+          exit 1
+
+      - name: Run API tests
+        working-directory: tests
+        env:
+          NODE_ENV: test
+          API_BASE_URL: ${{ env.STAGING_URL }}
+          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT || 'evergreen-api-tests/github-actions' }}
+        run: npm test

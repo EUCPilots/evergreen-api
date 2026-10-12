@@ -31,6 +31,12 @@ This repository includes comprehensive GitHub Actions workflows to ensure code q
 - ✅ Rate limiting validation
 - ✅ Automatic security issue creation
 
+### 4. Deploy to Staging (`deploy-staging.yml`)
+**Triggers:** Pushes to the `staging` branch that touch `src/**` or `tests/**`, manual runs
+- ✅ Deploys the worker to `evergreen-api-staging` (`wrangler deploy --env staging`)
+- ✅ Waits for `/health` to report `"environment":"staging"`
+- ✅ Runs the API test suite against https://evergreen-api-staging.stealthpuppy.workers.dev
+
 ## 🎯 Workflow Features
 
 ### Adaptive Testing
@@ -82,12 +88,13 @@ Add these badges to your README.md to show workflow status:
 ## 🔧 Configuration
 
 ### Required Secrets
-No secrets required - workflows test against public API endpoints.
+- `API_TEST_USERAGENT`: User-Agent sent by the API tests
+- `CF_API_TOKEN`: Cloudflare API token with **Workers Scripts: Edit** permission (used by `deploy-staging.yml`)
+- `CF_ACCOUNT_ID`: Cloudflare account ID (used by `deploy-staging.yml`)
 
 ### Optional Enhancements
 - **Slack Integration**: Add webhook URLs for notifications
 - **Performance Thresholds**: Set specific response time limits
-- **Custom Endpoints**: Add staging environment testing
 
 ## 📈 Monitoring
 
