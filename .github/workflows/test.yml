@@ -30,6 +30,7 @@ jobs:
       contents: read  # Required for checkout
     
     strategy:
+      max-parallel: 1
       matrix:
         node-version: [24.x, 26.x]
       fail-fast: false
@@ -50,21 +51,19 @@ jobs:
           cd tests
           npm ci
 
-      - name: Run API tests against production
+      - name: Wait before running API tests against production
+        run: sleep 11
+
+      - name: Run API tests and generate report
         run: |
           cd tests
-          npm test
+          npx mocha --timeout 30000 --reporter json > test-results.json || {
+            cat test-results.json
+            exit 1
+          }
+          node -e "const { stats } = require('./test-results.json'); console.log(\`API tests: \${stats.passes} passed, \${stats.failures} failed, \${stats.pending} pending\`)"
         env:
           NODE_ENV: test
-          API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT || 'evergreen-api-tests/github-actions' }}
-
-      - name: Generate test report
-        if: always()
-        run: |
-          cd tests
-          npx mocha test.js --timeout 30000 --reporter json > test-results.json || true
-          npx mocha test.js --timeout 30000 --reporter tap > test-results.tap || true
-        env:
           API_TEST_USERAGENT: ${{ secrets.API_TEST_USERAGENT || 'evergreen-api-tests/github-actions' }}
 
       - name: Upload test results
@@ -72,9 +71,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results-node-${{ matrix.node-version }}
-          path: |
-            tests/test-results.json
-            tests/test-results.tap
+          path: tests/test-results.json
 
   lint:
     name: Lint Code

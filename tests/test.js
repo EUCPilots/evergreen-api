@@ -10,9 +10,32 @@ before(async () => {
 // Test configuration
 const TEST_USER_AGENT = process.env.API_TEST_USERAGENT;
 const TIMEOUT = 30000; // 30 seconds for external API calls
+const RATE_LIMITED_PATHS = new Set([
+    '/app/MicrosoftEdgeWebView2Runtime',
+    '/app/MicrosoftEdge',
+    '/app/AdobeAcrobatReaderDC',
+    '/app/CitrixWorkspaceApp'
+]);
+const MIN_RATE_LIMIT_INTERVAL = 11000;
+const nextRateLimitedRequestAt = new Map();
 
 if (!TEST_USER_AGENT) {
     throw new Error('API_TEST_USERAGENT environment variable is required');
+}
+
+async function waitForRateLimit(path) {
+    const requestPath = path.split('?')[0];
+    if (!RATE_LIMITED_PATHS.has(requestPath)) {
+        return;
+    }
+
+    const now = Date.now();
+    const requestAt = Math.max(now, nextRateLimitedRequestAt.get(requestPath) || now);
+    nextRateLimitedRequestAt.set(requestPath, requestAt + MIN_RATE_LIMIT_INTERVAL);
+    const waitTime = requestAt - now;
+    if (waitTime > 0) {
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
 }
 
 // Helper function to make requests with proper headers
@@ -27,6 +50,18 @@ function makeRequestWithoutUserAgent(path) {
     return request
         .get(path)
         .timeout(TIMEOUT);
+}
+
+async function makeRateLimitedRequest(path, includeUserAgent = true) {
+    await waitForRateLimit(path);
+
+    const apiRequest = request
+        .get(path)
+        .timeout(TIMEOUT);
+
+    return includeUserAgent
+        ? apiRequest.set('User-Agent', TEST_USER_AGENT)
+        : apiRequest;
 }
 
 // Helper function to check if this is the new caching API
@@ -130,7 +165,7 @@ describe('Request validation', () => {
             .then((healthRes) => {
                 const newApi = isNewCachingAPI(healthRes.headers);
 
-                return makeRequestWithoutUserAgent('/app/MicrosoftEdge')
+                return makeRateLimitedRequest('/app/MicrosoftEdge', false)
                     .expect('Content-Type', /json/)
                     .then((res) => {
                         if (newApi) {
@@ -232,7 +267,7 @@ describe('Apps API', () => {
 // Individual app endpoint validation
 describe('App API', () => {
     it('GET /app/MicrosoftEdge should return app details or not found', () => {
-        return makeRequest('/app/MicrosoftEdge')
+        return makeRateLimitedRequest('/app/MicrosoftEdge')
             .expect('Content-Type', /json/)
             .then((res) => {
                 if (res.status === 200) {
