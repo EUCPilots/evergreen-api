@@ -20,7 +20,7 @@ const TABLES = {
     file: 'requests-by-path',
     columns: [
       { key: 'path', label: 'Path' },
-      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -28,7 +28,7 @@ const TABLES = {
     file: 'requests-by-connecting-ip',
     columns: [
       { key: 'connectingIp', label: 'Connecting IP' },
-      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -37,7 +37,7 @@ const TABLES = {
     columns: [
       { key: 'country', label: 'Country', fallback: 'Unknown', width: '11rem' },
       { key: 'region', label: 'Region', fallback: 'Unknown' },
-      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -45,7 +45,7 @@ const TABLES = {
     file: 'network-organizations',
     columns: [
       { key: 'asOrganization', label: 'AS organization' },
-      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -53,7 +53,7 @@ const TABLES = {
     file: 'user-agents',
     columns: [
       { key: 'userAgent', label: 'User agent' },
-      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -81,7 +81,7 @@ const TABLES = {
     columns: [
       { key: 'family', label: 'Client family' },
       { key: 'variants', label: 'Variants', type: 'count', width: '9rem' },
-      { key: 'count', label: 'Share of all requests', type: 'share', width: '11rem' },
+      { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -91,7 +91,7 @@ const TABLES = {
     columns: [
       { key: 'connectingIp', label: 'Connecting IP', width: '11rem' },
       { key: 'asOrganization', label: 'Organization', fallback: 'Unknown' },
-      { key: 'distinctPaths', label: 'Distinct paths', type: 'count', width: '9rem' },
+      { key: 'distinctPaths', label: 'Distinct paths', type: 'count', width: '11rem' },
       { key: 'count', label: 'Requests', type: 'count' }
     ]
   },
@@ -102,7 +102,7 @@ const TABLES = {
       { key: 'path', label: 'Path' },
       { key: 'earlierCount', label: 'Earlier period', type: 'count', width: '11rem' },
       { key: 'recentCount', label: 'Recent period', type: 'count', width: '11rem' },
-      { key: 'recentCount', label: 'Change', type: 'trendDelta' }
+      { key: 'recentCount', label: 'Change', type: 'trendDelta', width: '14rem' }
     ]
   }
 }
