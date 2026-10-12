@@ -57,7 +57,7 @@ jobs:
       - name: Run API tests and generate report
         run: |
           cd tests
-          npx mocha --timeout 30000 --reporter json > test-results.json || {
+          npx mocha --timeout 30000 --reporter json --reporter-option output=test-results.json || {
             cat test-results.json
             exit 1
           }
