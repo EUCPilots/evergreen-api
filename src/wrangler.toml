@@ -40,6 +40,8 @@ bucket_name = "evergreen-api"
 binding = "REQUEST_ANALYTICS"
 dataset = "evergreen_requests"
 
+# Staging: https://evergreen-api-staging.stealthpuppy.workers.dev
+# Shares the production EVERGREEN KV namespace (read-only usage), but logs/analytics are kept separate
 [env.staging]
 name = "evergreen-api-staging"
 vars = { ENVIRONMENT = "staging" }
