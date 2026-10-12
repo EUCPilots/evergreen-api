@@ -57,7 +57,6 @@
     table { font-size: .88rem; margin: 0; table-layout: fixed; width: 100%; min-width: 34rem; }
     th { background: var(--surface); color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
     td, th { padding: .65rem .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    tbody tr.top-path-row > * { background-color: var(--accent-soft); }
     tbody tr:hover > * { background-color: var(--accent-soft); }
     td.count, th.count { text-align: right; font-variant-numeric: tabular-nums; }
     th button.sort { background: transparent; border: 0; color: inherit; font: inherit; letter-spacing: inherit; margin: 0; padding: 0; text-transform: inherit; width: 100%; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -179,7 +178,7 @@
       <div id="daily-chart" class="overview" role="img" aria-label="Daily requests and unique connecting IPs, with values per day"></div>
       </section>
       <section id="paths-panel" role="tabpanel" aria-labelledby="paths-tab" tabindex="0" hidden>
-      <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used; top five rows highlighted</p></div></div>
+      <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
       <figure data-table="paths"></figure>
       </section>
       <section id="trendingPaths-panel" role="tabpanel" aria-labelledby="trendingPaths-tab" tabindex="0" hidden>

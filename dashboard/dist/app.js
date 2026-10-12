@@ -179,11 +179,8 @@ function renderTable(name) {
   }).join('')
 
   const rows = visibleRows(name)
-  const topPaths = name === 'paths'
-    ? new Set(rows.slice().sort((a, b) => Number(b.count) - Number(a.count)).slice(0, 5).map(row => row.path))
-    : null
   const body = rows.length
-    ? rows.map(row => `<tr${topPaths?.has(row.path) ? ' class="top-path-row"' : ''}>${columns.map(column => {
+    ? rows.map(row => `<tr>${columns.map(column => {
         if (column.type === 'share') {
           const share = total ? (Number(row[column.key]) || 0) / total : 0
           return `<td class="count"><span class="meter"><span style="width:${Math.min(share * 100, 100)}%"></span></span>${formatShare(share)}</td>`
