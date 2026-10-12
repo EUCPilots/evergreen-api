@@ -5,7 +5,9 @@
             "label": "Wrangler Dev",
             "type": "shell",
             "command": "wrangler",
-            "args": ["dev"],
+            "args": [
+                "dev"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -28,27 +30,62 @@
             },
             "runOptions": {
                 "instanceLimit": 1
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/src"
             }
         },
         {
             "label": "Wrangler Deploy (Staging)",
             "type": "shell",
             "command": "wrangler",
-            "args": ["deploy", "--env", "staging"],
+            "args": [
+                "deploy",
+                "--env",
+                "staging"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
                 "focus": true,
                 "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/src"
             }
         },
         {
             "label": "Wrangler Deploy (Production)",
             "type": "shell",
             "command": "wrangler",
-            "args": ["deploy", "--env", "production"],
+            "args": [
+                "deploy",
+                "--env",
+                "production"
+            ],
             "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "label": "Run API Tests",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "test"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/tests"
+            },
+            "group": "test",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -57,10 +94,13 @@
             }
         },
         {
-            "label": "Run API Tests",
+            "label": "Run API Tests (Staging)",
             "type": "shell",
             "command": "npm",
-            "args": ["test"],
+            "args": [
+                "run",
+                "test:staging"
+            ],
             "options": {
                 "cwd": "${workspaceFolder}/tests"
             },
@@ -88,20 +128,52 @@
             "label": "Wrangler KV List",
             "type": "shell",
             "command": "wrangler",
-            "args": ["kv:namespace", "list"],
+            "args": [
+                "kv:namespace",
+                "list"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
                 "focus": true,
                 "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/src"
             }
         },
         {
             "label": "Wrangler Tail Logs",
             "type": "shell",
             "command": "wrangler",
-            "args": ["tail"],
+            "args": [
+                "tail"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "isBackground": true,
+            "options": {
+                "cwd": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "label": "Wrangler Tail Logs (Staging)",
+            "type": "shell",
+            "command": "wrangler",
+            "args": [
+                "tail",
+                "--env",
+                "staging"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/src"
+            },
             "group": "build",
             "presentation": {
                 "echo": true,

@@ -108,13 +108,31 @@ cd tests && npm test
 ```
 
 ### Deployment
+Run these commands from the `src` directory, where `wrangler.toml` lives.
+
 ```bash
-# Deploy to staging
-wrangler deploy --env staging
+# Deploy to staging (https://evergreen-api-staging.stealthpuppy.workers.dev)
+npm run deploy:staging
 
 # Deploy to production
-wrangler deploy --env production
+npm run deploy:production
 ```
+
+### Validating changes in staging
+The `staging` environment deploys to the `evergreen-api-staging` worker. It reads from the same `EVERGREEN` KV namespace as production, so it serves the same data. Request logs and analytics go to a separate R2 bucket (`evergreen-api-staging`) and Analytics Engine dataset (`evergreen_requests_staging`).
+
+```bash
+# Deploy and tail staging logs
+cd src
+npm run deploy:staging
+npm run tail:staging
+
+# Run the API tests against staging
+cd ../tests
+API_TEST_USERAGENT="<user agent>" npm run test:staging
+```
+
+Pushing to the `staging` branch also deploys to staging and runs the API tests through the [Deploy to Staging](./.github/workflows/deploy-staging.yml) workflow. Once staging passes, merge to `main` and deploy to production.
 
 ## 📚 Documentation
 
@@ -147,7 +165,7 @@ wrangler deploy --env production
 ## 🔧 Configuration
 
 ### Environment Variables
-- `ENVIRONMENT`: deployment environment (production/staging/dev)
+- `ENVIRONMENT`: deployment environment (production/staging/dev), reported by `/health`
 
 ### Bindings
 - `EVERGREEN`: KV namespace for application data
