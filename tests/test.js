@@ -162,28 +162,26 @@ describe('Request validation', () => {
 
     it('GET /app/MicrosoftEdge without User-Agent should stay compatible with deployed API variants', () => {
         return makeRequest('/health')
-            .then((healthRes) => {
+            .then(async (healthRes) => {
                 const newApi = isNewCachingAPI(healthRes.headers);
 
-                return makeRateLimitedRequest('/app/MicrosoftEdge', false)
-                    .expect('Content-Type', /json/)
-                    .then((res) => {
-                        if (newApi) {
-                            assert.equal(res.status, 400);
-                            assert.property(res.body, 'message');
-                            assert.include(res.body.message, 'User-Agent');
-                        } else if (res.status === 200) {
-                            if (Array.isArray(res.body)) {
-                                assert.isArray(res.body);
-                            } else {
-                                assert.isObject(res.body);
-                            }
-                        } else if (res.status === 404) {
-                            assert.property(res.body, 'message');
-                        } else {
-                            throw new Error(`Unexpected status code: ${res.status}`);
-                        }
-                    });
+                const res = await makeRateLimitedRequest('/app/MicrosoftEdge', false);
+                assert.match(res.headers['content-type'], /json/);
+                if (newApi) {
+                    assert.equal(res.status, 400);
+                    assert.property(res.body, 'message');
+                    assert.include(res.body.message, 'User-Agent');
+                } else if (res.status === 200) {
+                    if (Array.isArray(res.body)) {
+                        assert.isArray(res.body);
+                    } else {
+                        assert.isObject(res.body);
+                    }
+                } else if (res.status === 404) {
+                    assert.property(res.body, 'message');
+                } else {
+                    throw new Error(`Unexpected status code: ${res.status}`);
+                }
             });
     });
 });
@@ -266,37 +264,35 @@ describe('Apps API', () => {
 
 // Individual app endpoint validation
 describe('App API', () => {
-    it('GET /app/MicrosoftEdge should return app details or not found', () => {
-        return makeRateLimitedRequest('/app/MicrosoftEdge')
-            .expect('Content-Type', /json/)
-            .then((res) => {
-                if (res.status === 200) {
-                    // App data exists - validate structure
-                    if (Array.isArray(res.body)) {
-                        // Production API returns array
-                        assert.isArray(res.body);
-                        assert.isNotEmpty(res.body);
-                        
-                        const firstItem = res.body[0];
-                        assert.property(firstItem, 'Version');
-                        assert.property(firstItem, 'URI');
-                    } else {
-                        // New API returns object
-                        assert.isObject(res.body);
-                        assert.property(res.body, 'Version');
-                        assert.property(res.body, 'URI');
-                    }
-                    
-                    // Check cache headers
-                    assert.property(res.headers, 'cache-control');
-                } else if (res.status === 404) {
-                    // Expected if no data in KV
-                    assert.property(res.body, 'message');
-                    assert.include(res.body.message, 'Application not found');
-                } else {
-                    throw new Error(`Unexpected status code: ${res.status}`);
-                }
-            });
+    it('GET /app/MicrosoftEdge should return app details or not found', async () => {
+        const res = await makeRateLimitedRequest('/app/MicrosoftEdge');
+        assert.match(res.headers['content-type'], /json/);
+        if (res.status === 200) {
+            // App data exists - validate structure
+            if (Array.isArray(res.body)) {
+                // Production API returns array
+                assert.isArray(res.body);
+                assert.isNotEmpty(res.body);
+
+                const firstItem = res.body[0];
+                assert.property(firstItem, 'Version');
+                assert.property(firstItem, 'URI');
+            } else {
+                // New API returns object
+                assert.isObject(res.body);
+                assert.property(res.body, 'Version');
+                assert.property(res.body, 'URI');
+            }
+
+            // Check cache headers
+            assert.property(res.headers, 'cache-control');
+        } else if (res.status === 404) {
+            // Expected if no data in KV
+            assert.property(res.body, 'message');
+            assert.include(res.body.message, 'Application not found');
+        } else {
+            throw new Error(`Unexpected status code: ${res.status}`);
+        }
     });
 
     it('GET /app without name should return 400 error', () => {
