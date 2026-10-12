@@ -1,6 +1,7 @@
 {
     "scripts": {
-        "test": "mocha"
+        "test": "mocha",
+        "test:staging": "API_BASE_URL=https://evergreen-api-staging.stealthpuppy.workers.dev mocha"
     },
     "devDependencies": {
         "chai": "^6.2.2",

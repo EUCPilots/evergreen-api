@@ -5,7 +5,10 @@
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "publish": "wrangler publish"
+    "publish": "wrangler publish",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "tail:staging": "wrangler tail --env staging"
   },
   "repository": {
     "type": "git",

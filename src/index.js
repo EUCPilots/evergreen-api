@@ -535,6 +535,7 @@ export default {
     globalThis.LOGS_BUCKET = env.LOGS_BUCKET
     globalThis.REQUEST_ANALYTICS = env.REQUEST_ANALYTICS
     globalThis.API_TEST_USERAGENT = env.API_TEST_USERAGENT
+    globalThis.ENVIRONMENT = env.ENVIRONMENT
 
     const startTime = Date.now()
     const url = new URL(request.url)
