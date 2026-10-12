@@ -118,3 +118,4 @@ logs.csv
 # Other files
 auth.json
 .wrangler
+data.json
