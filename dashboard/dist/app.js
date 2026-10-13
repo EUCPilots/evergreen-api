@@ -257,7 +257,6 @@ const SVG_NS = 'http://www.w3.org/2000/svg'
 const VB_W = 920
 const CHART_ML = 56
 const CHART_MR = 18
-const CHART_PLOT_W = VB_W - CHART_ML - CHART_MR
 const MA_WINDOW = 7
 const BAR_MAX = 24
 const BAR_RADIUS = 4
@@ -323,12 +322,15 @@ function columnPath(x, y, width, height, radius) {
 }
 
 function drawChartPanel(svg, days, options) {
-  const { plotTop, plotHeight, values, showXAxis, xAxisBand, axisTitle } = options
+  const { plotTop, plotHeight, viewHeight, values, showXAxis, xAxisBand, axisTitle } = options
+  const svgWidth = svg.getBoundingClientRect().width || svg.viewBox.baseVal.width || VB_W
+  const plotWidth = svgWidth - CHART_ML - CHART_MR
   const baseline = plotTop + plotHeight
+  svg.setAttribute('viewBox', `0 0 ${svgWidth} ${viewHeight}`)
   svg.textContent = ''
 
   const count = days.length
-  const band = CHART_PLOT_W / Math.max(count, 1)
+  const band = plotWidth / Math.max(count, 1)
   const scale = niceScale(Math.max(...values, 1))
   const y = value => baseline - (value / scale.max) * plotHeight
 
@@ -342,7 +344,7 @@ function drawChartPanel(svg, days, options) {
   for (const tick of scale.ticks) {
     const ty = y(tick)
     svg.appendChild(svgEl('line', {
-      class: tick === 0 ? 'baseline-rule' : 'grid-line', x1: CHART_ML, x2: CHART_ML + CHART_PLOT_W, y1: ty, y2: ty
+      class: tick === 0 ? 'baseline-rule' : 'grid-line', x1: CHART_ML, x2: CHART_ML + plotWidth, y1: ty, y2: ty
     }))
     const label = svgEl('text', { class: 'tick-text', x: CHART_ML - 8, y: ty + 4, 'text-anchor': 'end' })
     label.textContent = tick >= 1000 ? `${numberFormat.format(tick / 1000)}k` : numberFormat.format(tick)
@@ -378,7 +380,7 @@ function drawChartPanel(svg, days, options) {
   const crosshair = svgEl('line', { class: 'crosshair', x1: 0, x2: 0, y1: plotTop - 4, y2: baseline })
   crosshair.setAttribute('hidden', '')
   svg.appendChild(crosshair)
-  return { crosshair }
+  return { crosshair, svgWidth, plotWidth }
 }
 
 function drawRequestsPanel({ svg, days, band, y, baseline }) {
@@ -487,11 +489,11 @@ function renderDailyChart() {
 
   state.chart.panels = [
     drawChartPanel(svgRequests, days, {
-      plotTop: 26, plotHeight: 130, xAxisBand: 0, showXAxis: false, axisTitle: 'Requests',
+      plotTop: 26, plotHeight: 130, viewHeight: 180, xAxisBand: 0, showXAxis: false, axisTitle: 'Requests',
       values: days.map(day => Number(day.count) || 0), draw: drawRequestsPanel
     }),
     drawChartPanel(svgIps, days, {
-      plotTop: 26, plotHeight: 100, xAxisBand: 42, showXAxis: true, axisTitle: 'Unique IPs',
+      plotTop: 26, plotHeight: 100, viewHeight: 168, xAxisBand: 42, showXAxis: true, axisTitle: 'Unique IPs',
       values: days.map(day => Number(day.uniqueConnectingIps) || 0), draw: drawIpsPanel
     })
   ]
@@ -518,7 +520,8 @@ function setupChartInteraction() {
     if (index < 0 || index >= days.length) return
     active = index
     const day = days[index]
-    const band = CHART_PLOT_W / days.length
+    const { svgWidth, plotWidth } = state.chart.panels[0]
+    const band = plotWidth / days.length
     const vbX = CHART_ML + band * (index + 0.5)
 
     for (const panel of state.chart.panels) {
@@ -565,7 +568,7 @@ function setupChartInteraction() {
     tooltip.hidden = false
     const plotRect = svgRequests.getBoundingClientRect()
     const chartRect = chart.getBoundingClientRect()
-    const pixelX = plotRect.left - chartRect.left + (vbX / VB_W) * plotRect.width
+    const pixelX = plotRect.left - chartRect.left + (vbX / svgWidth) * plotRect.width
     const width = tooltip.offsetWidth
     tooltip.style.left = `${Math.min(Math.max(pixelX - width / 2, 4), chart.clientWidth - width - 4)}px`
     tooltip.style.top = `${plotRect.top - chartRect.top + 8}px`
@@ -579,8 +582,9 @@ function setupChartInteraction() {
     const days = state.chart.days
     if (!days.length) return
     const plotRect = svgRequests.getBoundingClientRect()
-    const vbX = ((event.clientX - plotRect.left) / plotRect.width) * VB_W
-    const index = Math.floor((vbX - CHART_ML) / (CHART_PLOT_W / days.length))
+    const { svgWidth, plotWidth } = state.chart.panels[0]
+    const vbX = ((event.clientX - plotRect.left) / plotRect.width) * svgWidth
+    const index = Math.floor((vbX - CHART_ML) / (plotWidth / days.length))
     if (index < 0 || index >= days.length) return hide()
     if (index !== active) show(index)
   })
@@ -595,6 +599,10 @@ function setupChartInteraction() {
     else if (event.key === 'End') { event.preventDefault(); show(last) }
     else if (event.key === 'Escape') hide()
   })
+  const chartResizeObserver = new ResizeObserver(([entry]) => {
+    if (entry.contentRect.width > 0) renderDailyChart()
+  })
+  chartResizeObserver.observe(svgRequests)
 }
 
 function renderCoverage() {
@@ -756,6 +764,8 @@ function setupTabs() {
         item.tabIndex = selected ? 0 : -1
         document.getElementById(item.getAttribute('aria-controls')).hidden = !selected
       })
+      const chart = document.getElementById('svg-requests')
+      if (state.data && chart.getBoundingClientRect().width > 0) renderDailyChart()
     }
 
     tabs.forEach((tab, index) => {
