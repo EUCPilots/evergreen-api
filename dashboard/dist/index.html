@@ -110,6 +110,7 @@
     .plot-scroll { overflow-x: auto; overflow-y: hidden; }
     .plot-inner { min-width: 660px; }
     .chart svg { display: block; width: 100%; }
+    .chart svg[hidden] { display: none; }
     .chart #svg-requests { height: 180px; }
     .chart #svg-ips { height: 168px; }
     .panel + .panel { margin-top: .4rem; }
@@ -134,6 +135,22 @@
     .crosshair[hidden] { display: none; }
     .chart-tooltip { background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px #17211b24; font-size: .8rem; min-width: 11rem; padding: .55rem .7rem; pointer-events: none; position: absolute; z-index: 5; }
     .chart-tooltip[hidden] { display: none; }
+    .wide-plot { min-width: 920px; }
+    .dimension-chart { padding-bottom: .4rem; }
+    .dimension-label { fill: var(--ink); font-size: 12px; }
+    .dimension-value { font-size: 12px; }
+    .direct-label.dimension-value-inside { fill: #fff; }
+    .dimension-bar, .burst-cell, .hour-bar { cursor: crosshair; }
+    .burst-axis-label { fill: var(--ink); font-size: 12px; font-weight: 700; }
+    .burst-axis-sub-label { fill: var(--muted); font-size: 10px; }
+    .burst-bin-legend { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: .72rem; gap: .3rem .8rem; }
+    .burst-bin-legend span { align-items: center; display: inline-flex; gap: .3rem; }
+    .burst-bin-legend i { border: 1px solid #17211b18; border-radius: 2px; height: .75rem; width: .75rem; }
+    .burst-bin-legend .unused-bin { opacity: .35; }
+    .hour-zone-controls { align-items: center; display: flex; gap: .35rem; }
+    .hour-zone-controls button { background: transparent; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: .72rem; margin: 0; padding: .2rem .5rem; width: auto; }
+    .hour-zone-controls button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+    .zone-note { color: var(--muted); font-size: .7rem; margin: 0; }
     .tip-date { font-weight: 700; margin-bottom: .35rem; }
     .tip-row { align-items: center; display: flex; gap: .5rem; justify-content: space-between; }
     .tip-row + .tip-row { margin-top: .15rem; }
@@ -231,6 +248,13 @@
       </section>
       <section id="paths-panel" role="tabpanel" aria-labelledby="paths-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>
+      <div class="chart dimension-chart" id="dimension-chart-paths" tabindex="0" role="application" aria-label="Top request paths by count. Use arrow keys to inspect bars; the table below lists every path.">
+        <p class="visually-hidden" aria-live="polite"></p>
+        <div class="plot-scroll"><div class="plot-inner wide-plot"><svg id="svg-dimension-paths" role="img" aria-label="Horizontal bar chart of request counts by path"></svg></div></div>
+        <p class="empty chart-empty" id="dimension-empty-paths" hidden>No matching data</p>
+        <div class="chart-tooltip" hidden></div>
+      </div>
+      <p class="section-note" id="dimension-readout-paths"></p>
       <figure data-table="paths"></figure>
       </section>
       <section id="trendingPaths-panel" role="tabpanel" aria-labelledby="trendingPaths-tab" tabindex="0" hidden>
@@ -255,6 +279,13 @@
       </div>
       <section id="locations-panel" role="tabpanel" aria-labelledby="locations-tab" tabindex="0">
       <div class="section-heading" id="table-locations" data-table="locations"><div class="heading-text"><h2>Country and region</h2><p>Where API traffic originates</p></div></div>
+      <div class="chart dimension-chart" id="dimension-chart-locations" tabindex="0" role="application" aria-label="Top countries by request count. Use arrow keys to inspect bars; the table below lists every country and region.">
+        <p class="visually-hidden" aria-live="polite"></p>
+        <div class="plot-scroll"><div class="plot-inner wide-plot"><svg id="svg-dimension-locations" role="img" aria-label="Horizontal bar chart of request counts by country"></svg></div></div>
+        <p class="empty chart-empty" id="dimension-empty-locations" hidden>No matching data</p>
+        <div class="chart-tooltip" hidden></div>
+      </div>
+      <p class="section-note" id="dimension-readout-locations"></p>
       <figure data-table="locations"></figure>
       </section>
       <section id="userAgents-panel" role="tabpanel" aria-labelledby="userAgents-tab" tabindex="0" hidden>
@@ -267,6 +298,13 @@
       </section>
       <section id="organizations-panel" role="tabpanel" aria-labelledby="organizations-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-organizations" data-table="organizations"><div class="heading-text"><h2>Network organizations</h2><p>Known organizations among all repeat IPs</p></div></div>
+      <div class="chart dimension-chart" id="dimension-chart-organizations" tabindex="0" role="application" aria-label="Top network organizations by request count. Use arrow keys to inspect bars; the table below lists every organization.">
+        <p class="visually-hidden" aria-live="polite"></p>
+        <div class="plot-scroll"><div class="plot-inner wide-plot"><svg id="svg-dimension-organizations" role="img" aria-label="Horizontal bar chart of request counts by network organization"></svg></div></div>
+        <p class="empty chart-empty" id="dimension-empty-organizations" hidden>No matching data</p>
+        <div class="chart-tooltip" hidden></div>
+      </div>
+      <p class="section-note" id="dimension-readout-organizations"></p>
       <figure data-table="organizations"></figure>
       </section>
     </section>
@@ -279,7 +317,34 @@
       <section id="bursts-panel" role="tabpanel" aria-labelledby="bursts-tab" tabindex="0">
       <div id="burst-notice" class="notice">Loading detection criteria&hellip;</div>
       <div class="section-heading" id="table-bursts" data-table="bursts"><div class="heading-text"><h2>High-volume request windows</h2><p>Repeated calls grouped by IP, path, and user agent</p></div></div>
+      <div class="chart" id="burst-chart" tabindex="0" role="application" aria-label="Burst request timeline. Use arrow keys to inspect populated IP-day cells and hour bars; the table below lists every flagged request window.">
+        <p class="visually-hidden" aria-live="polite" id="burst-chart-live"></p>
+        <div id="burst-charts">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Flagged requests by IP and UTC day</h3>
+              <div class="legend burst-bin-legend" id="burst-bin-legend" aria-label="Requests per IP-day"></div>
+            </div>
+            <div class="plot-scroll"><div class="plot-inner wide-plot"><svg id="svg-burst-swimlane" role="img" aria-label="Heatmap of flagged requests by connecting IP and UTC day"></svg></div></div>
+          </div>
+          <div class="panel burst-hour-panel">
+            <div class="panel-head">
+              <h3>Flagged windows by hour (<span id="burst-hour-zone-name">UTC</span>)</h3>
+              <div class="hour-zone-controls" id="burst-hour-toggle" role="group" aria-label="Hour chart time zone">
+                <button type="button" data-zone="UTC" aria-pressed="true">UTC</button>
+                <button type="button" data-zone="Local" aria-pressed="false">Local</button>
+              </div>
+              <p class="zone-note">Local uses your viewer timezone, which may differ from the traffic's timezone.</p>
+            </div>
+            <div class="plot-scroll"><div class="plot-inner wide-plot"><svg id="svg-burst-hours" role="img" aria-label="Histogram of flagged request windows by hour"></svg></div></div>
+            <p class="section-note" id="burst-hour-readout"></p>
+          </div>
+        </div>
+        <p class="empty chart-empty" id="burst-chart-empty" hidden>No matching data</p>
+        <div class="chart-tooltip" hidden></div>
+      </div>
       <div id="burst-groups" class="burst-overview" aria-live="polite"></div>
+      <figure data-table="bursts"></figure>
       </section>
       <section id="pathDiversity-panel" role="tabpanel" aria-labelledby="pathDiversity-tab" tabindex="0" hidden>
       <div id="path-diversity-notice" class="notice">Loading detection criteria&hellip;</div>

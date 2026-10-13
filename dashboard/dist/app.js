@@ -2,7 +2,14 @@ const state = {
   data: null,
   filter: '',
   sort: {},
-  chart: { days: [], panels: [] }
+  charts: {
+    trend: { days: [], panels: [] },
+    paths: { items: [] },
+    locations: { items: [] },
+    organizations: { items: [] },
+    bursts: { items: [], heatmapItems: [], hourItems: [], groups: [] }
+  },
+  burstHourZone: 'UTC'
 }
 
 const numberFormat = new Intl.NumberFormat()
@@ -19,6 +26,7 @@ function formatShare(share) {
 const TABLES = {
   paths: {
     file: 'requests-by-path',
+    chart: { labelKey: 'path', rollupLabel: 'All other paths', minBars: 8, maxBars: 20 },
     columns: [
       { key: 'path', label: 'Path' },
       { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
@@ -35,6 +43,7 @@ const TABLES = {
   },
   locations: {
     file: 'country-and-region',
+    chart: { labelKey: 'country', rollupLabel: 'All other countries', minBars: 8, maxBars: 20 },
     columns: [
       { key: 'country', label: 'Country', fallback: 'Unknown', width: '11rem' },
       { key: 'region', label: 'Region', fallback: 'Unknown' },
@@ -44,6 +53,7 @@ const TABLES = {
   },
   organizations: {
     file: 'network-organizations',
+    chart: { labelKey: 'asOrganization', rollupLabel: 'All other organizations', minBars: 8, maxBars: 20 },
     columns: [
       { key: 'asOrganization', label: 'AS organization' },
       { key: 'count', label: 'Share of all requests', type: 'share', width: '13rem' },
@@ -142,6 +152,13 @@ function cellText(column, row) {
   return String(value ?? '') || column.fallback || ''
 }
 
+function tableCellText(column, row) {
+  if (column.type === 'timestamp' && row[column.key]) {
+    return burstDate(row[column.key]).toLocaleString(undefined, { timeZone: 'UTC' })
+  }
+  return cellText(column, row)
+}
+
 function sortValue(column, row) {
   if (column.type === 'trendDelta') return trendDelta(row).delta
   if (isNumeric(column)) return Number(row[column.key]) || 0
@@ -200,7 +217,7 @@ function renderTable(name) {
           const trendClass = delta > 0 ? 'trend-up' : delta < 0 ? 'trend-down' : ''
           return `<td class="count ${trendClass}">${cellText(column, row)}</td>`
         }
-        const text = cellText(column, row)
+        const text = tableCellText(column, row)
         return `<td class="${column.type === 'count' ? 'count' : ''}" title="${escapeHtml(text)}">${escapeHtml(text)}</td>`
       }).join('')}</tr>`).join('')
     : `<tr><td colspan="${columns.length}" class="empty">No matching data</td></tr>`
@@ -341,6 +358,11 @@ function drawChartPanel(svg, days, options) {
     }))
   })
 
+  for (const name of ['paths', 'locations', 'organizations']) {
+    attachChartTooltip(`dimension-chart-${name}`, dimensionTooltipOptions(name))
+  }
+  setupBurstChartInteractions()
+
   for (const tick of scale.ticks) {
     const ty = y(tick)
     svg.appendChild(svgEl('line', {
@@ -465,6 +487,95 @@ function renderTrendReadout(days) {
     `the partial final day is excluded from both averages and from the 7-day line.`
 }
 
+function attachChartTooltip(chartId, { getItems, indexFromPointer, buildRows, describe, position, onShow, onHide }) {
+  const chart = document.getElementById(chartId)
+  const tooltip = chart?.querySelector('.chart-tooltip')
+  const live = chart?.querySelector('[aria-live]')
+  if (!chart || !tooltip || !live) return { show: () => {}, hide: () => {} }
+  let active = -1
+
+  const hide = () => {
+    active = -1
+    tooltip.hidden = true
+    onHide?.()
+  }
+
+  const show = index => {
+    const items = getItems()
+    if (!Number.isInteger(index) || index < 0 || index >= items.length) {
+      hide()
+      return
+    }
+    active = index
+    const item = items[index]
+    const content = buildRows(item)
+    tooltip.textContent = ''
+    const heading = document.createElement('div')
+    heading.className = 'tip-date'
+    heading.textContent = content.heading
+    tooltip.appendChild(heading)
+
+    for (const rowData of content.rows) {
+      const row = document.createElement('div')
+      row.className = 'tip-row'
+      const label = document.createElement('span')
+      label.className = 'tip-name'
+      if (rowData.colour) {
+        const key = document.createElement('i')
+        key.className = rowData.keyClass || 'key-rect'
+        key.style.background = rowData.colour
+        label.appendChild(key)
+      }
+      label.appendChild(document.createTextNode(rowData.name))
+      const amount = document.createElement('span')
+      amount.className = 'tip-value'
+      amount.textContent = rowData.value
+      row.appendChild(label)
+      row.appendChild(amount)
+      tooltip.appendChild(row)
+    }
+    if (content.flag) {
+      const flag = document.createElement('div')
+      flag.className = 'tip-flag'
+      flag.textContent = content.flag
+      tooltip.appendChild(flag)
+    }
+
+    tooltip.hidden = false
+    onShow?.(index, item)
+    const anchor = position(index, item, chart)
+    const width = tooltip.offsetWidth
+    const height = tooltip.offsetHeight
+    tooltip.style.left = `${Math.min(Math.max(anchor.x - width / 2, 4), Math.max(chart.clientWidth - width - 4, 4))}px`
+    tooltip.style.top = `${Math.min(Math.max(anchor.y, 4), Math.max(chart.clientHeight - height - 4, 4))}px`
+    live.textContent = describe(item)
+  }
+
+  chart.addEventListener('pointermove', event => {
+    const index = indexFromPointer(event, chart)
+    if (index === null || index === undefined) {
+      hide()
+      return
+    }
+    if (index !== active) show(index)
+  })
+  chart.addEventListener('pointerleave', hide)
+  chart.addEventListener('blur', event => {
+    if (!chart.contains(event.relatedTarget)) hide()
+  })
+  chart.addEventListener('keydown', event => {
+    if (event.target !== chart) return
+    const last = getItems().length - 1
+    if (last < 0) return
+    if (event.key === 'ArrowRight') { event.preventDefault(); show(Math.min((active < 0 ? -1 : active) + 1, last)) }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); show(Math.max((active < 0 ? last + 1 : active) - 1, 0)) }
+    else if (event.key === 'Home') { event.preventDefault(); show(0) }
+    else if (event.key === 'End') { event.preventDefault(); show(last) }
+    else if (event.key === 'Escape') hide()
+  })
+  return { show, hide }
+}
+
 function renderDailyChart() {
   const svgRequests = document.getElementById('svg-requests')
   const svgIps = document.getElementById('svg-ips')
@@ -476,7 +587,7 @@ function renderDailyChart() {
     .slice()
     .sort((left, right) => String(left.day).localeCompare(String(right.day)))
 
-  state.chart = { days, panels: [] }
+  state.charts.trend = { days, panels: [] }
 
   if (!days.length) {
     svgRequests.textContent = ''
@@ -487,7 +598,7 @@ function renderDailyChart() {
   }
   empty.hidden = true
 
-  state.chart.panels = [
+  state.charts.trend.panels = [
     drawChartPanel(svgRequests, days, {
       plotTop: 26, plotHeight: 130, viewHeight: 180, xAxisBand: 0, showXAxis: false, axisTitle: 'Requests',
       values: days.map(day => Number(day.count) || 0), draw: drawRequestsPanel
@@ -501,108 +612,563 @@ function renderDailyChart() {
   renderTrendReadout(days)
 }
 
-function setupChartInteraction() {
-  const chart = document.getElementById('daily-chart')
-  const tooltip = document.getElementById('chart-tooltip')
-  const live = document.getElementById('chart-live')
+function setupChartInteractions() {
   const svgRequests = document.getElementById('svg-requests')
-  if (!chart || !tooltip || !svgRequests) return
-  let active = -1
-
-  const hide = () => {
-    active = -1
-    tooltip.hidden = true
-    for (const panel of state.chart.panels) panel.crosshair.setAttribute('hidden', '')
-  }
-
-  const show = index => {
-    const days = state.chart.days
-    if (index < 0 || index >= days.length) return
-    active = index
-    const day = days[index]
-    const { svgWidth, plotWidth } = state.chart.panels[0]
-    const band = plotWidth / days.length
-    const vbX = CHART_ML + band * (index + 0.5)
-
-    for (const panel of state.chart.panels) {
-      panel.crosshair.setAttribute('x1', vbX)
-      panel.crosshair.setAttribute('x2', vbX)
-      panel.crosshair.removeAttribute('hidden')
-    }
-
-    tooltip.textContent = ''
-    const heading = document.createElement('div')
-    heading.className = 'tip-date'
-    heading.textContent = chartFullDayFormat.format(trendDate(day))
-    tooltip.appendChild(heading)
-
-    const rows = [
-      ['Requests', numberFormat.format(Number(day.count) || 0), 'var(--accent)'],
-      ['7-day average', day.average === null || day.average === undefined ? 'not yet available' : numberFormat.format(day.average), 'var(--chart-average)'],
-      ['Unique IPs', numberFormat.format(Number(day.uniqueConnectingIps) || 0), 'var(--chart-ips)']
-    ]
-    for (const [name, value, colour] of rows) {
-      const row = document.createElement('div')
-      row.className = 'tip-row'
-      const label = document.createElement('span')
-      label.className = 'tip-name'
-      const key = document.createElement('i')
-      key.className = 'key-line'
-      key.style.background = colour
-      label.appendChild(key)
-      label.appendChild(document.createTextNode(name))
-      const amount = document.createElement('span')
-      amount.className = 'tip-value'
-      amount.textContent = value
-      row.appendChild(label)
-      row.appendChild(amount)
-      tooltip.appendChild(row)
-    }
-    if (day.isPartial) {
-      const flag = document.createElement('div')
-      flag.className = 'tip-flag'
-      flag.textContent = 'Partial day - collection stopped mid-day'
-      tooltip.appendChild(flag)
-    }
-
-    tooltip.hidden = false
-    const plotRect = svgRequests.getBoundingClientRect()
-    const chartRect = chart.getBoundingClientRect()
-    const pixelX = plotRect.left - chartRect.left + (vbX / svgWidth) * plotRect.width
-    const width = tooltip.offsetWidth
-    tooltip.style.left = `${Math.min(Math.max(pixelX - width / 2, 4), chart.clientWidth - width - 4)}px`
-    tooltip.style.top = `${plotRect.top - chartRect.top + 8}px`
-
-    live.textContent = `${chartFullDayFormat.format(trendDate(day))}: ` +
+  if (!svgRequests) return
+  attachChartTooltip('daily-chart', {
+    getItems: () => state.charts.trend.days,
+    indexFromPointer: event => {
+      const days = state.charts.trend.days
+      const panel = state.charts.trend.panels[0]
+      if (!days.length || !panel) return null
+      const plotRect = svgRequests.getBoundingClientRect()
+      const vbX = ((event.clientX - plotRect.left) / plotRect.width) * panel.svgWidth
+      const index = Math.floor((vbX - CHART_ML) / (panel.plotWidth / days.length))
+      return index >= 0 && index < days.length ? index : null
+    },
+    buildRows: day => ({
+      heading: chartFullDayFormat.format(trendDate(day)),
+      rows: [
+        { name: 'Requests', value: numberFormat.format(Number(day.count) || 0), colour: 'var(--accent)' },
+        { name: '7-day average', value: day.average === null || day.average === undefined ? 'not yet available' : numberFormat.format(day.average), colour: 'var(--chart-average)', keyClass: 'key-line' },
+        { name: 'Unique IPs', value: numberFormat.format(Number(day.uniqueConnectingIps) || 0), colour: 'var(--chart-ips)', keyClass: 'key-line' }
+      ],
+      flag: day.isPartial ? 'Partial day - collection stopped mid-day' : ''
+    }),
+    describe: day => `${chartFullDayFormat.format(trendDate(day))}: ` +
       `${numberFormat.format(Number(day.count) || 0)} requests, ` +
-      `${numberFormat.format(Number(day.uniqueConnectingIps) || 0)} unique IPs${day.isPartial ? ', partial day' : ''}`
-  }
+      `${numberFormat.format(Number(day.uniqueConnectingIps) || 0)} unique IPs${day.isPartial ? ', partial day' : ''}`,
+    position: (index, day, chart) => {
+      const panel = state.charts.trend.panels[0]
+      const plotRect = svgRequests.getBoundingClientRect()
+      const chartRect = chart.getBoundingClientRect()
+      const band = panel.plotWidth / state.charts.trend.days.length
+      const vbX = CHART_ML + band * (index + 0.5)
+      return {
+        x: plotRect.left - chartRect.left + (vbX / panel.svgWidth) * plotRect.width,
+        y: plotRect.top - chartRect.top + 8
+      }
+    },
+    onShow: index => {
+      const days = state.charts.trend.days
+      const panel = state.charts.trend.panels[0]
+      if (!panel) return
+      const band = panel.plotWidth / days.length
+      const vbX = CHART_ML + band * (index + 0.5)
+      for (const chartPanel of state.charts.trend.panels) {
+        chartPanel.crosshair.setAttribute('x1', vbX)
+        chartPanel.crosshair.setAttribute('x2', vbX)
+        chartPanel.crosshair.removeAttribute('hidden')
+      }
+    },
+    onHide: () => state.charts.trend.panels.forEach(panel => panel.crosshair.setAttribute('hidden', ''))
+  })
 
-  chart.addEventListener('pointermove', event => {
-    const days = state.chart.days
-    if (!days.length) return
-    const plotRect = svgRequests.getBoundingClientRect()
-    const { svgWidth, plotWidth } = state.chart.panels[0]
-    const vbX = ((event.clientX - plotRect.left) / plotRect.width) * svgWidth
-    const index = Math.floor((vbX - CHART_ML) / (plotWidth / days.length))
-    if (index < 0 || index >= days.length) return hide()
-    if (index !== active) show(index)
-  })
-  chart.addEventListener('pointerleave', hide)
-  chart.addEventListener('blur', hide)
-  chart.addEventListener('keydown', event => {
-    const last = state.chart.days.length - 1
-    if (last < 0) return
-    if (event.key === 'ArrowRight') { event.preventDefault(); show(Math.min((active < 0 ? -1 : active) + 1, last)) }
-    else if (event.key === 'ArrowLeft') { event.preventDefault(); show(Math.max((active < 0 ? last + 1 : active) - 1, 0)) }
-    else if (event.key === 'Home') { event.preventDefault(); show(0) }
-    else if (event.key === 'End') { event.preventDefault(); show(last) }
-    else if (event.key === 'Escape') hide()
-  })
   const chartResizeObserver = new ResizeObserver(([entry]) => {
     if (entry.contentRect.width > 0) renderDailyChart()
   })
   chartResizeObserver.observe(svgRequests)
+}
+
+function sortedDimensionRows(name) {
+  const config = TABLES[name].chart
+  let rows = visibleRows(name)
+  if (name === 'locations') {
+    const countries = new Map()
+    for (const row of rows) {
+      const country = String(row.country || 'Unknown')
+      countries.set(country, (countries.get(country) || 0) + (Number(row.count) || 0))
+    }
+    rows = Array.from(countries, ([country, count]) => ({ country, count }))
+  }
+  return rows.map((row, index) => ({ ...row, originalIndex: index }))
+    .sort((left, right) => (Number(right.count) || 0) - (Number(left.count) || 0) ||
+      String(left[config.labelKey] || '').localeCompare(String(right[config.labelKey] || '')) ||
+      left.originalIndex - right.originalIndex)
+    .map(({ originalIndex, ...row }) => row)
+}
+
+function renderDimensionChart(name) {
+  const config = TABLES[name].chart
+  const svg = document.getElementById(`svg-dimension-${name}`)
+  const empty = document.getElementById(`dimension-empty-${name}`)
+  const readout = document.getElementById(`dimension-readout-${name}`)
+  if (!config || !svg || !empty || !readout) return
+
+  const rows = sortedDimensionRows(name)
+  if (!rows.length) {
+    svg.textContent = ''
+    svg.hidden = true
+    empty.hidden = false
+    readout.textContent = ''
+    state.charts[name] = { items: [] }
+    return
+  }
+
+  svg.hidden = false
+  empty.hidden = true
+  const grandTotal = Number(state.data.summary?.totalRequests) || 0
+  const rowsTotal = rows.reduce((sum, row) => sum + (Number(row.count) || 0), 0)
+  const useRowsDenominator = rowsTotal < grandTotal * 0.8
+  const threshold = (useRowsDenominator ? rowsTotal : grandTotal) * 0.8
+  let accumulated = 0
+  let crossing = rows.length
+  for (let index = 0; index < rows.length; index++) {
+    accumulated += Number(rows[index].count) || 0
+    if (accumulated >= threshold) {
+      crossing = index + 1
+      break
+    }
+  }
+  const topN = Math.min(rows.length, Math.max(config.minBars, Math.min(config.maxBars, crossing)))
+  const items = rows.slice(0, topN).map(row => ({
+    label: String(row[config.labelKey] || 'Unknown'),
+    count: Number(row.count) || 0
+  }))
+  const remainder = rows.slice(topN)
+  const remainderCount = remainder.reduce((sum, row) => sum + (Number(row.count) || 0), 0)
+  if (remainderCount > 0) {
+    items.push({
+      label: `${config.rollupLabel} (${numberFormat.format(remainder.length)})`,
+      count: remainderCount,
+      rollup: true
+    })
+  }
+
+  const width = VB_W
+  const rowStep = 26
+  const plotTop = 18
+  const plotLeft = 350
+  const plotWidth = width - plotLeft - CHART_MR
+  const axisHeight = 36
+  const height = plotTop + items.length * rowStep + axisHeight
+  const scale = niceScale(Math.max(...items.map(item => item.count), 1))
+  const x = value => plotLeft + (value / scale.max) * plotWidth
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+  svg.style.height = `${height}px`
+  svg.textContent = ''
+
+  for (const tick of scale.ticks) {
+    const tx = x(tick)
+    svg.appendChild(svgEl('line', {
+      class: 'grid-line', x1: tx, x2: tx, y1: plotTop - 4, y2: height - axisHeight + 2
+    }))
+    const label = svgEl('text', {
+      class: 'tick-text', x: tx, y: height - 10, 'text-anchor': 'middle'
+    })
+    label.textContent = tick >= 1000 ? `${numberFormat.format(tick / 1000)}k` : numberFormat.format(tick)
+    svg.appendChild(label)
+  }
+
+  items.forEach((item, index) => {
+    const y = plotTop + index * rowStep
+    const barHeight = Math.min(BAR_MAX, rowStep - 2)
+    const barY = y + (rowStep - barHeight) / 2
+    const barEnd = x(item.count)
+    const barWidth = Math.max(0, barEnd - plotLeft)
+    const group = svgEl('g', { 'data-tooltip-index': index, class: 'dimension-bar' })
+    group.appendChild(svgEl('rect', {
+      x: 0, y, width, height: rowStep, fill: 'transparent', class: 'chart-hit'
+    }))
+    const label = svgEl('text', {
+      class: 'dimension-label', x: plotLeft - 12, y: y + rowStep / 2 + 4, 'text-anchor': 'end'
+    })
+    const shortLabel = item.label.length > 46 ? `${item.label.slice(0, 45)}…` : item.label
+    label.textContent = shortLabel
+    const title = svgEl('title')
+    title.textContent = item.label
+    label.appendChild(title)
+    group.appendChild(label)
+    const bar = svgEl('path', {
+      d: columnPath(plotLeft, barY, barWidth, barHeight, BAR_RADIUS),
+      fill: item.rollup ? 'var(--muted)' : 'var(--accent)'
+    })
+    group.appendChild(bar)
+    const valueLabel = svgEl('text', {
+      class: 'direct-label dimension-value',
+      x: barEnd + 7,
+      y: y + rowStep / 2 + 4,
+      'text-anchor': 'start'
+    })
+    valueLabel.textContent = numberFormat.format(item.count)
+    if (barEnd + 58 > width - CHART_MR) {
+      valueLabel.setAttribute('x', Math.max(plotLeft + 4, barEnd - 7))
+      valueLabel.setAttribute('text-anchor', 'end')
+      valueLabel.classList.add('dimension-value-inside')
+    }
+    group.appendChild(valueLabel)
+    svg.appendChild(group)
+    item.anchorX = Math.min(barEnd + 28, width - CHART_MR)
+    item.anchorY = y + rowStep / 2
+  })
+
+  const label = name === 'locations' ? 'countries' : name === 'organizations' ? 'organizations' : 'paths'
+  const scope = useRowsDenominator ? 'of the requests this table covers' : 'of requests'
+  readout.textContent = `${crossing} of ${numberFormat.format(rows.length)} ${label} account for 80% ${scope}.` +
+    (remainder.length && items[topN - 1]?.count === remainder[0]?.count ? ' A tie at the chart cutoff may split equal values.' : '')
+
+  state.charts[name] = { items }
+}
+
+function burstDate(value) {
+  const text = String(value || '').trim().replace(' ', 'T')
+  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(text) ? text : `${text}Z`)
+}
+
+const BURST_BINS = [
+  { min: 10, max: 24, label: '10-24', colour: '#93d4bd' },
+  { min: 25, max: 59, label: '25-59', colour: '#3fae89' },
+  { min: 60, max: 149, label: '60-149', colour: '#0b7a58' },
+  { min: 150, max: Infinity, label: '150+', colour: '#06513a' }
+]
+const MAX_BURST_IP_ROWS = 30
+const LOCAL_HOUR_FORMAT = new Intl.DateTimeFormat(undefined, { hour: '2-digit', hourCycle: 'h23' })
+
+function burstBin(value) {
+  return BURST_BINS.findIndex(bin => value >= bin.min && value <= bin.max)
+}
+
+function buildBurstGrid(rows) {
+  const groups = new Map()
+  for (const row of rows) {
+    const ip = String(row.connectingIp || 'Unknown')
+    let group = groups.get(ip)
+    if (!group) {
+      group = { ip, total: 0, byDay: new Map(), windows: new Map(), organizations: new Map() }
+      groups.set(ip, group)
+    }
+    const count = Number(row.count) || 0
+    const day = String(row.windowStart || '').slice(0, 10)
+    group.total += count
+    group.byDay.set(day, (group.byDay.get(day) || 0) + count)
+    if (!group.windows.has(day)) group.windows.set(day, new Set())
+    group.windows.get(day).add(row.windowStart)
+    const organization = String(row.asOrganization || 'Unknown')
+    group.organizations.set(organization, (group.organizations.get(organization) || 0) + count)
+  }
+  return Array.from(groups.values()).map(group => ({
+    ...group,
+    organization: Array.from(group.organizations.entries()).sort((left, right) => right[1] - left[1])[0]?.[0] || 'Unknown'
+  })).sort((left, right) => right.total - left.total)
+}
+
+function dimensionTooltipOptions(name) {
+  const svg = document.getElementById(`svg-dimension-${name}`)
+  return {
+    getItems: () => state.charts[name].items,
+    indexFromPointer: event => {
+      const target = event.target.closest('[data-tooltip-index]')
+      return target ? Number(target.getAttribute('data-tooltip-index')) : null
+    },
+    buildRows: item => ({
+      heading: item.label,
+      rows: [
+        { name: 'Requests', value: numberFormat.format(item.count), colour: item.rollup ? 'var(--muted)' : 'var(--accent)' },
+        { name: 'Share of all requests', value: formatShare((Number(state.data.summary?.totalRequests) || 0) ? item.count / Number(state.data.summary.totalRequests) : 0) }
+      ]
+    }),
+    describe: item => `${item.label}: ${numberFormat.format(item.count)} requests, ` +
+      `${formatShare((Number(state.data.summary?.totalRequests) || 0) ? item.count / Number(state.data.summary.totalRequests) : 0)} of all requests`,
+    position: (index, item, chart) => {
+      const svgRect = svg.getBoundingClientRect()
+      const chartRect = chart.getBoundingClientRect()
+      return {
+        x: svgRect.left - chartRect.left + (item.anchorX / VB_W) * svgRect.width,
+        y: svgRect.top - chartRect.top + (item.anchorY / (svg.viewBox.baseVal.height || 1)) * svgRect.height
+      }
+    }
+  }
+}
+
+function renderBurstSwimlane() {
+  const svg = document.getElementById('svg-burst-swimlane')
+  const empty = document.getElementById('burst-chart-empty')
+  const legend = document.getElementById('burst-bin-legend')
+  const shell = document.getElementById('burst-charts')
+  if (!svg || !empty || !legend || !shell) return
+
+  if (!(state.data.bursts || []).length) {
+    shell.hidden = true
+    state.charts.bursts = { items: [], heatmapItems: [], hourItems: [], groups: [] }
+    return
+  }
+  shell.hidden = false
+  const rows = visibleRows('bursts')
+  const groups = buildBurstGrid(rows)
+  const days = (state.data.trend || []).map(row => String(row.day).slice(0, 10))
+  const visibleGroups = groups.slice(0, MAX_BURST_IP_ROWS)
+  const width = VB_W
+  const labelWidth = 222
+  const plotLeft = labelWidth
+  const plotWidth = width - plotLeft - CHART_MR
+  const band = plotWidth / Math.max(days.length, 1)
+  const rowHeight = 34
+  const plotTop = 38
+  const height = plotTop + visibleGroups.length * rowHeight + 14 + (groups.length > MAX_BURST_IP_ROWS ? rowHeight : 0)
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
+  svg.style.height = `${height}px`
+  svg.textContent = ''
+  const occupiedBins = new Set()
+
+  days.forEach((day, index) => {
+    const date = new Date(`${day}T00:00:00Z`)
+    const weekday = date.getUTCDay()
+    const x = plotLeft + band * index
+    if (weekday === 0 || weekday === 6) {
+      svg.appendChild(svgEl('rect', { class: 'weekend-band', x, y: plotTop - 24, width: band, height: visibleGroups.length * rowHeight + 26 }))
+    }
+  })
+  const stride = Math.max(1, Math.ceil(46 / band))
+  days.forEach((day, index) => {
+    if (index % stride !== 0 && index !== days.length - 1) return
+    const label = svgEl('text', {
+      class: 'tick-text', x: plotLeft + band * (index + 0.5), y: plotTop - 8, 'text-anchor': 'middle'
+    })
+    label.textContent = chartDayFormat.format(new Date(`${day}T00:00:00Z`))
+    svg.appendChild(label)
+  })
+
+  const heatmapItems = []
+  visibleGroups.forEach((group, rowIndex) => {
+    const rowY = plotTop + rowIndex * rowHeight
+    const row = svgEl('g', { 'data-burst-ip': group.ip, class: 'burst-swimlane-row' })
+    row.appendChild(svgEl('rect', {
+      x: 0, y: rowY, width, height: rowHeight, fill: 'transparent', class: 'chart-hit'
+    }))
+    const ipLabel = svgEl('text', {
+      class: 'burst-axis-label', x: 8, y: rowY + 13
+    })
+    ipLabel.textContent = group.ip
+    const ipTitle = svgEl('title')
+    ipTitle.textContent = `${group.ip}; ${group.organization}`
+    ipLabel.appendChild(ipTitle)
+    row.appendChild(ipLabel)
+    const orgLabel = svgEl('text', { class: 'burst-axis-sub-label', x: 8, y: rowY + 27 })
+    orgLabel.textContent = group.organization.length > 28 ? `${group.organization.slice(0, 27)}…` : group.organization
+    const orgTitle = svgEl('title')
+    orgTitle.textContent = group.organization
+    orgLabel.appendChild(orgTitle)
+    row.appendChild(orgLabel)
+
+    days.forEach((day, dayIndex) => {
+      const count = group.byDay.get(day) || 0
+      if (!count) return
+      const binIndex = burstBin(count)
+      if (binIndex < 0) return
+      occupiedBins.add(binIndex)
+      const windowCount = group.windows.get(day)?.size || 0
+      const item = {
+        ip: group.ip, organization: group.organization, day, count, windowCount,
+        anchorX: plotLeft + band * (dayIndex + 0.5),
+        anchorY: rowY + rowHeight / 2,
+        svgId: 'svg-burst-swimlane'
+      }
+      const itemIndex = heatmapItems.push(item) - 1
+      const cell = svgEl('g', { 'data-tooltip-index': itemIndex, class: 'burst-cell' })
+      cell.appendChild(svgEl('rect', {
+        x: plotLeft + band * (dayIndex + 0.5) - Math.min(24, band - 4) / 2,
+        y: rowY + (rowHeight - Math.min(24, band - 4)) / 2,
+        width: Math.min(24, band - 4),
+        height: Math.min(24, band - 4),
+        rx: 3,
+        fill: BURST_BINS[binIndex].colour,
+        stroke: '#fff',
+        'stroke-width': 1
+      }))
+      const title = svgEl('title')
+      title.textContent = `${group.ip}, ${day}, ${numberFormat.format(count)} requests`
+      cell.appendChild(title)
+      row.appendChild(cell)
+    })
+    svg.appendChild(row)
+  })
+  if (groups.length > MAX_BURST_IP_ROWS) {
+    const more = svgEl('text', {
+      class: 'burst-axis-sub-label', x: 8, y: plotTop + visibleGroups.length * rowHeight + 12
+    })
+    more.textContent = `and ${numberFormat.format(groups.length - MAX_BURST_IP_ROWS)} more IPs`
+    svg.appendChild(more)
+  }
+
+  legend.innerHTML = BURST_BINS.map((bin, index) => {
+    const dimmed = occupiedBins.has(index) ? '' : ' class="unused-bin"'
+    return `<span${dimmed}><i style="background:${bin.colour}"></i>${bin.label} requests</span>`
+  }).join('')
+  empty.hidden = rows.length > 0
+  svg.hidden = rows.length === 0
+  state.charts.bursts.heatmapItems = heatmapItems
+  state.charts.bursts.groups = groups
+  state.charts.bursts.items = [...heatmapItems, ...(state.charts.bursts.hourItems || [])]
+  svg.querySelectorAll('.burst-swimlane-row').forEach(row => row.addEventListener('click', () => {
+    const details = [...document.querySelectorAll('#burst-groups details[data-burst-ip]')]
+      .find(item => item.dataset.burstIp === row.dataset.burstIp)
+    if (!details) return
+    details.open = true
+    details.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }))
+}
+
+function renderBurstHours() {
+  const svg = document.getElementById('svg-burst-hours')
+  const readout = document.getElementById('burst-hour-readout')
+  const zoneName = document.getElementById('burst-hour-zone-name')
+  const empty = document.getElementById('burst-chart-empty')
+  if (!svg || !readout || !zoneName || !empty) return
+
+  const rows = visibleRows('bursts')
+  if (!rows.length) {
+    svg.textContent = ''
+    readout.textContent = ''
+    svg.hidden = true
+    state.charts.bursts.hourItems = []
+    state.charts.bursts.items = [...state.charts.bursts.heatmapItems]
+    return
+  }
+  svg.hidden = false
+  empty.hidden = true
+  const zone = state.burstHourZone
+  zoneName.textContent = zone
+  const counts = Array.from({ length: 24 }, (_, hour) => ({ hour, windows: 0, requests: 0 }))
+  for (const row of rows) {
+    const date = burstDate(row.windowStart)
+    const hour = zone === 'UTC'
+      ? date.getUTCHours()
+      : Number(LOCAL_HOUR_FORMAT.formatToParts(date).find(part => part.type === 'hour')?.value)
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) continue
+    counts[hour].windows++
+    counts[hour].requests += Number(row.count) || 0
+  }
+
+  const totalWindows = rows.length
+  const totalRequests = rows.reduce((sum, row) => sum + (Number(row.count) || 0), 0)
+  let peakStart = 0
+  let peakWindows = -1
+  for (let start = 0; start < 24; start++) {
+    const windows = counts[start].windows + counts[(start + 1) % 24].windows + counts[(start + 2) % 24].windows
+    if (windows > peakWindows) {
+      peakWindows = windows
+      peakStart = start
+    }
+  }
+  const peakEnd = (peakStart + 2) % 24
+  const peakRequests = counts[peakStart].requests + counts[(peakStart + 1) % 24].requests + counts[peakEnd].requests
+  const windowPercent = totalWindows ? percentFormat.format(peakWindows / totalWindows) : percentFormat.format(0)
+  const hourText = hour => String(hour).padStart(2, '0')
+  readout.textContent = `${windowPercent} of flagged windows fall between ${hourText(peakStart)}:00 and ${hourText(peakEnd)}:59 ${zone}, carrying ` +
+    `${numberFormat.format(peakRequests)} of ${numberFormat.format(totalRequests)} flagged requests; this is consistent with scheduled jobs, not proof of abuse.`
+
+  const width = VB_W
+  const plotTop = 36
+  const plotHeight = 148
+  const baseline = plotTop + plotHeight
+  const plotWidth = width - CHART_ML - CHART_MR
+  const band = plotWidth / 24
+  const scale = niceScale(Math.max(...counts.map(item => item.windows), 1))
+  const y = value => baseline - (value / scale.max) * plotHeight
+  svg.setAttribute('viewBox', `0 0 ${width} 236`)
+  svg.style.height = '236px'
+  svg.textContent = ''
+
+  const axisTitle = svgEl('text', { class: 'axis-title', x: 2, y: 18, 'text-anchor': 'start' })
+  axisTitle.textContent = `Hour of day (${zone})`
+  svg.appendChild(axisTitle)
+  for (const tick of scale.ticks) {
+    const ty = y(tick)
+    svg.appendChild(svgEl('line', {
+      class: tick === 0 ? 'baseline-rule' : 'grid-line', x1: CHART_ML, x2: CHART_ML + plotWidth, y1: ty, y2: ty
+    }))
+    const label = svgEl('text', { class: 'tick-text', x: CHART_ML - 8, y: ty + 4, 'text-anchor': 'end' })
+    label.textContent = numberFormat.format(tick)
+    svg.appendChild(label)
+  }
+
+  const hourItems = []
+  counts.forEach((item, index) => {
+    const x = CHART_ML + band * index
+    const top = y(item.windows)
+    const barWidth = Math.min(BAR_MAX, band - 4)
+    const barX = x + (band - barWidth) / 2
+    const itemIndex = state.charts.bursts.heatmapItems.length + index
+    const group = svgEl('g', { 'data-tooltip-index': itemIndex, class: 'hour-bar' })
+    group.appendChild(svgEl('path', {
+      d: columnPath(barX, top, barWidth, baseline - top, BAR_RADIUS),
+      fill: 'var(--accent)'
+    }))
+    group.appendChild(svgEl('rect', { x, y: plotTop, width: band, height: plotHeight, fill: 'transparent', class: 'chart-hit' }))
+    const tickLabel = svgEl('text', {
+      class: 'tick-text', x: x + band / 2, y: baseline + 20, 'text-anchor': 'middle'
+    })
+    tickLabel.textContent = hourText(item.hour)
+    svg.appendChild(tickLabel)
+    svg.appendChild(group)
+    hourItems.push({
+      ...item,
+      zone,
+      anchorX: x + band / 2,
+      anchorY: Math.max(plotTop + 4, top),
+      svgId: 'svg-burst-hours'
+    })
+  })
+  if (totalWindows) {
+    const peak = counts.reduce((best, item) => item.windows > best.windows ? item : best, counts[0])
+    const peakX = CHART_ML + band * (peak.hour + 0.5)
+    const label = svgEl('text', {
+      class: 'direct-label', x: peakX, y: y(peak.windows) - 7, 'text-anchor': 'middle',
+      stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke'
+    })
+    label.textContent = numberFormat.format(peak.windows)
+    svg.appendChild(label)
+  }
+  state.charts.bursts.hourItems = hourItems
+  state.charts.bursts.items = [...state.charts.bursts.heatmapItems, ...hourItems]
+}
+
+function setupBurstChartInteractions() {
+  attachChartTooltip('burst-chart', {
+    getItems: () => state.charts.bursts.items,
+    indexFromPointer: event => {
+      const target = event.target.closest('[data-tooltip-index]')
+      return target ? Number(target.getAttribute('data-tooltip-index')) : null
+    },
+    buildRows: item => item.ip ? ({
+      heading: `${item.ip} · ${chartFullDayFormat.format(new Date(`${item.day}T00:00:00Z`))}`,
+      rows: [
+        { name: 'Requests', value: numberFormat.format(item.count), colour: BURST_BINS[burstBin(item.count)]?.colour },
+        { name: 'Flagged windows', value: numberFormat.format(item.windowCount) },
+        { name: 'Organization', value: item.organization }
+      ]
+    }) : ({
+      heading: `${String(item.hour).padStart(2, '0')}:00-${String(item.hour).padStart(2, '0')}:59 ${item.zone}`,
+      rows: [
+        { name: 'Flagged windows', value: numberFormat.format(item.windows), colour: 'var(--accent)' },
+        { name: 'Requests', value: numberFormat.format(item.requests) }
+      ]
+    }),
+    describe: item => item.ip
+      ? `${item.ip}, ${chartFullDayFormat.format(new Date(`${item.day}T00:00:00Z`))}: ${numberFormat.format(item.count)} requests in ${numberFormat.format(item.windowCount)} flagged windows`
+      : `${String(item.hour).padStart(2, '0')}:00 ${item.zone}: ${numberFormat.format(item.windows)} flagged windows, ${numberFormat.format(item.requests)} requests`,
+    position: (index, item, chart) => {
+      const svg = document.getElementById(item.svgId)
+      const svgRect = svg.getBoundingClientRect()
+      const chartRect = chart.getBoundingClientRect()
+      const viewBox = svg.viewBox.baseVal
+      return {
+        x: svgRect.left - chartRect.left + (item.anchorX / viewBox.width) * svgRect.width,
+        y: svgRect.top - chartRect.top + (item.anchorY / viewBox.height) * svgRect.height
+      }
+    }
+  })
+
+  // This is a display-zone control, not a filter; it only rebuckets the hour histogram.
+  document.getElementById('burst-hour-toggle')?.addEventListener('click', event => {
+    const button = event.target.closest('button[data-zone]')
+    if (!button) return
+    state.burstHourZone = button.dataset.zone
+    document.querySelectorAll('#burst-hour-toggle button[data-zone]').forEach(item => {
+      item.setAttribute('aria-pressed', String(item === button))
+    })
+    renderBurstHours()
+  })
 }
 
 function renderCoverage() {
@@ -655,7 +1221,7 @@ function renderBurstGroups() {
           `</div>`
       }).join('')
 
-    return `<details class="burst-group"${index === 0 ? ' open' : ''}>` +
+    return `<details class="burst-group" data-burst-ip="${escapeHtml(group.connectingIp)}"${index === 0 ? ' open' : ''}>` +
       `<summary><div class="burst-group-summary">` +
       `<div class="burst-identity"><strong>${escapeHtml(group.connectingIp)}</strong><span title="${escapeHtml(group.organization)}">${escapeHtml(group.organization)}</span></div>` +
       `<div class="burst-activity" title="${numberFormat.format(group.requests)} requests"><span style="width:${activityWidth}%"></span></div>` +
@@ -671,8 +1237,12 @@ function renderBurstGroups() {
 }
 
 function render() {
+  // Every summary chart or grouped view stays paired with its complete, filterable table.
   Object.keys(TABLES).forEach(name => renderTable(name))
   renderDailyChart()
+  Object.keys(TABLES).filter(name => TABLES[name].chart).forEach(renderDimensionChart)
+  renderBurstSwimlane()
+  renderBurstHours()
   renderBurstGroups()
 }
 
@@ -828,7 +1398,7 @@ async function init() {
 
   setupExportButtons()
   setupSorting()
-  setupChartInteraction()
+  setupChartInteractions()
   render()
 }
 
