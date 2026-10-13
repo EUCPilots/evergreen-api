@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Daily traffic chart prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" />
+<style>
+  /* Tokens mirror dashboard/dist/index.html so this drops straight in. */
+  :root {
+    --ink: #17211b;
+    --muted: #637168;
+    --line: #dce3de;
+    --surface: #f5f7f5;
+    --accent: #087f5b;
+    --warning: #a44318;
+    --warning-soft: #fff0e8;
+    --page: #ffffff;
+
+    /* Chart roles. Series validated with the dataviz palette validator:
+       light  #087f5b / #2a78d6 on #ffffff - all checks pass
+       dark   #19a670 / #3987e5 on #1a1a19 - all checks pass */
+    --series-requests: #087f5b;
+    --series-ips: #2a78d6;
+    --series-average: #4a5a50;
+    --grid: #e6ebe7;
+    --band: #f2f5f2;
+    --chart-surface: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      --ink: #eef2ef; --muted: #a3b0a7; --line: #333833; --surface: #222522;
+      --accent: #19a670; --warning: #e0834f; --warning-soft: #2b1d14; --page: #1a1a19;
+      --series-requests: #19a670; --series-ips: #3987e5; --series-average: #9aa79f;
+      --grid: #2c302c; --band: #222522; --chart-surface: #1a1a19;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eef2ef; --muted: #a3b0a7; --line: #333833; --surface: #222522;
+    --accent: #19a670; --warning: #e0834f; --warning-soft: #2b1d14; --page: #1a1a19;
+    --series-requests: #19a670; --series-ips: #3987e5; --series-average: #9aa79f;
+    --grid: #2c302c; --band: #222522; --chart-surface: #1a1a19;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--page); color: var(--ink); margin: 0;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.5;
+  }
+  .container { max-width: 70rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .eyebrow { color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .25rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .35rem; }
+  .lede { color: var(--muted); margin: 0 0 1.5rem; font-size: .9rem; }
+  .proto-note { background: var(--warning-soft); border-left: 3px solid var(--warning); padding: .8rem 1rem; margin: 0 0 1.75rem; font-size: .85rem; }
+  .proto-note strong { color: inherit; }
+
+  .section-heading { align-items: baseline; display: flex; justify-content: space-between; gap: 1rem; margin: 1.75rem 0 .6rem; }
+  .section-heading h2 { font-size: 1.05rem; margin: 0; }
+  .section-heading p { color: var(--muted); font-size: .82rem; margin: 0; }
+
+  /* Chart ------------------------------------------------------------- */
+  .chart { position: relative; border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1rem .5rem; background: var(--chart-surface); }
+  .chart:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: 0 0 .2rem; }
+  .panel-head h3 { font-size: .85rem; margin: 0; font-weight: 700; }
+  .panel-head .panel-sub { color: var(--muted); font-size: .76rem; }
+  .panel + .panel { margin-top: .4rem; }
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; color: var(--muted); font-size: .76rem; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: .4rem; }
+  .key-rect { width: .7rem; height: .7rem; border-radius: 2px; background: var(--series-requests); display: inline-block; }
+  .key-line { width: 1rem; height: 2px; border-radius: 1px; background: var(--series-average); display: inline-block; }
+  .key-band { width: .7rem; height: .7rem; border-radius: 2px; background: var(--band); border: 1px solid var(--line); display: inline-block; }
+  .key-partial { width: .7rem; height: .7rem; border-radius: 2px; display: inline-block; border: 2px solid var(--series-requests); background: color-mix(in srgb, var(--series-requests) 22%, transparent); }
+  .plot-scroll { overflow-x: auto; overflow-y: hidden; }
+  .plot-inner { min-width: 660px; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .tick-text { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .axis-title { fill: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+  .baseline { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+  .weekend-band { fill: var(--band); }
+  .direct-label { fill: var(--ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .partial-note { fill: var(--muted); font-size: 11px; }
+  .crosshair { stroke: var(--ink); stroke-width: 1; opacity: .35; pointer-events: none; }
+  .crosshair[hidden] { display: none; }
+
+  .tooltip {
+    position: absolute; z-index: 5; pointer-events: none; min-width: 11rem;
+    background: var(--page); border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(23,33,27,.14); padding: .55rem .7rem; font-size: .8rem;
+  }
+  .tooltip[hidden] { display: none; }
+  .tooltip .tip-date { font-weight: 700; margin-bottom: .35rem; }
+  .tooltip .tip-row { display: flex; align-items: center; gap: .5rem; justify-content: space-between; }
+  .tooltip .tip-row + .tip-row { margin-top: .15rem; }
+  .tooltip .tip-name { color: var(--muted); display: inline-flex; align-items: center; gap: .4rem; }
+  .tooltip .tip-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tooltip .tip-flag { color: var(--warning); font-size: .72rem; margin-top: .35rem; }
+
+  .readout { color: var(--muted); font-size: .85rem; margin: .9rem 0 0; }
+  .readout strong { color: var(--ink); }
+
+  /* Table view -------------------------------------------------------- */
+  figure { border: 1px solid var(--line); border-radius: 6px; margin: 0; overflow: auto; }
+  table { font-size: .88rem; border-collapse: collapse; width: 100%; }
+  th { background: var(--surface); color: var(--muted); font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; text-align: left; }
+  td, th { padding: .6rem .8rem; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover > * { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  td.count, th.count { text-align: right; font-variant-numeric: tabular-nums; }
+  tfoot td { font-weight: 700; border-top: 1px solid var(--line); background: var(--surface); }
+  .tag { font-size: .7rem; color: var(--muted); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (max-width: 700px) {
+    .container { padding: 1rem .75rem 3rem; }
+    .panel-head { gap: .25rem; }
+  }
+</style>
+</head>
+<body>
+<main class="container">
+  <p class="eyebrow">Evergreen API</p>
+  <h1>Daily traffic chart prototype</h1>
+  <p class="lede" id="lede">Loading&hellip;</p>
+
+  <div class="proto-note">
+    <strong>Prototype.</strong> Replaces the stacked dual-bar list in <code>#daily-chart</code>. Two panels share one time
+    axis instead of overlaying two incompatible scales on one plot, weekends are shaded, a 7-day average separates trend
+    from the weekly cycle, and the partial collection day is drawn as an outline so it stops reading as a real decline.
+    The table view below is new: <code>TABLES.trend</code> is configured in <code>app.js</code> and has a CSV export button,
+    but <code>index.html</code> has no <code>&lt;figure data-table="trend"&gt;</code>, so no trend table is rendered today.
+  </div>
+
+  <div class="section-heading">
+    <div>
+      <h2>Daily traffic</h2>
+      <p>Requests and unique connecting IPs per UTC day</p>
+    </div>
+  </div>
+
+  <div class="chart" id="chart" tabindex="0" role="application"
+       aria-label="Daily requests and unique connecting IPs. Use left and right arrow keys to step through days.">
+    <p class="visually-hidden" id="chart-live" aria-live="polite"></p>
+
+    <div class="plot-scroll">
+     <div class="plot-inner">
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Requests per day</h3>
+        <div class="legend">
+          <span><i class="key-rect"></i>Requests</span>
+          <span><i class="key-line"></i>7-day average</span>
+          <span><i class="key-partial"></i>Partial day</span>
+          <span><i class="key-band"></i>Weekend</span>
+        </div>
+      </div>
+      <svg id="svg-requests" viewBox="0 0 920 180" preserveAspectRatio="xMidYMid meet" role="img"
+           aria-label="Column chart of requests per day"></svg>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Unique connecting IPs per day</h3>
+        <span class="panel-sub">Scaled independently of the panel above</span>
+      </div>
+      <svg id="svg-ips" viewBox="0 0 920 168" preserveAspectRatio="xMidYMid meet" role="img"
+           aria-label="Line chart of unique connecting IPs per day"></svg>
+    </div>
+     </div>
+    </div>
+
+    <div class="tooltip" id="tooltip" hidden></div>
+  </div>
+
+  <p class="readout" id="readout"></p>
+
+  <div class="section-heading">
+    <div>
+      <h2>Table view</h2>
+      <p>Every plotted value, in full. Nothing in the chart is reachable only by hovering</p>
+    </div>
+  </div>
+  <figure>
+    <table id="trend-table">
+      <thead>
+        <tr>
+          <th scope="col">Day</th>
+          <th scope="col">Weekday</th>
+          <th scope="col" class="count">Requests</th>
+          <th scope="col" class="count">7-day average</th>
+          <th scope="col" class="count">Unique IPs</th>
+          <th scope="col" class="count">Requests per IP</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot></tfoot>
+    </table>
+  </figure>
+</main>
+
+<script>
+// Snapshot of dist/data.json trend so the file also opens over file:// where fetch is blocked.
+const FALLBACK = {
+  generatedAt: '2026-10-13T17:11:39.016Z',
+  trend: [
+    { day: '2026-09-25 00:00:00', count: '7069', uniqueConnectingIps: '145' },
+    { day: '2026-09-26 00:00:00', count: '2374', uniqueConnectingIps: '223' },
+    { day: '2026-09-27 00:00:00', count: '2410', uniqueConnectingIps: '393' },
+    { day: '2026-09-28 00:00:00', count: '6780', uniqueConnectingIps: '508' },
+    { day: '2026-09-29 00:00:00', count: '4608', uniqueConnectingIps: '369' },
+    { day: '2026-09-30 00:00:00', count: '4465', uniqueConnectingIps: '445' },
+    { day: '2026-10-01 00:00:00', count: '6776', uniqueConnectingIps: '593' },
+    { day: '2026-10-02 00:00:00', count: '4662', uniqueConnectingIps: '387' },
+    { day: '2026-10-03 00:00:00', count: '2724', uniqueConnectingIps: '226' },
+    { day: '2026-10-04 00:00:00', count: '2459', uniqueConnectingIps: '393' },
+    { day: '2026-10-05 00:00:00', count: '7392', uniqueConnectingIps: '505' },
+    { day: '2026-10-06 00:00:00', count: '5337', uniqueConnectingIps: '349' },
+    { day: '2026-10-07 00:00:00', count: '5380', uniqueConnectingIps: '420' },
+    { day: '2026-10-08 00:00:00', count: '6406', uniqueConnectingIps: '538' },
+    { day: '2026-10-09 00:00:00', count: '4631', uniqueConnectingIps: '412' },
+    { day: '2026-10-10 00:00:00', count: '2868', uniqueConnectingIps: '221' },
+    { day: '2026-10-11 00:00:00', count: '2360', uniqueConnectingIps: '355' },
+    { day: '2026-10-12 00:00:00', count: '7317', uniqueConnectingIps: '512' },
+    { day: '2026-10-13 00:00:00', count: '3644', uniqueConnectingIps: '324' }
+  ],
+  lookbackDays: 30
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const VB_W = 920
+const ML = 56
+const MR = 18
+const PLOT_W = VB_W - ML - MR
+const MA_WINDOW = 7
+const BAR_MAX = 24
+const BAR_RADIUS = 4
+
+const numberFormat = new Intl.NumberFormat()
+const oneDecimal = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
+const dayFormat = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' })
+const fullDayFormat = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+const el = (name, attrs = {}) => {
+  const node = document.createElementNS(SVG_NS, name)
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value))
+  return node
+}
+
+const toNumber = value => Number(value) || 0
+const utcDate = value => new Date(`${String(value).slice(0, 10)}T00:00:00Z`)
+
+function niceScale(max, tickCount = 4) {
+  if (!(max > 0)) return { max: 1, ticks: [0, 1] }
+  const rough = max / tickCount
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)))
+  const normalised = rough / magnitude
+  const step = (normalised <= 1 ? 1 : normalised <= 2 ? 2 : normalised <= 2.5 ? 2.5 : normalised <= 5 ? 5 : 10) * magnitude
+  const niceMax = Math.ceil(max / step) * step
+  const ticks = []
+  for (let value = 0; value <= niceMax + step / 1000; value += step) ticks.push(value)
+  return { max: niceMax, ticks }
+}
+
+// Square at the baseline, 4px rounded at the data end.
+function columnPath(x, y, width, height, radius) {
+  if (height <= 0) return ''
+  const r = Math.min(radius, width / 2, height)
+  const bottom = y + height
+  return `M${x} ${bottom} L${x} ${y + r} Q${x} ${y} ${x + r} ${y} L${x + width - r} ${y} Q${x + width} ${y} ${x + width} ${y + r} L${x + width} ${bottom} Z`
+}
+
+function buildModel(raw) {
+  const generatedDay = String(raw.generatedAt || '').slice(0, 10)
+  const days = (raw.trend || []).map(row => {
+    const date = utcDate(row.day)
+    const key = String(row.day).slice(0, 10)
+    const weekdayIndex = date.getUTCDay()
+    return {
+      key,
+      date,
+      requests: toNumber(row.count),
+      ips: toNumber(row.uniqueConnectingIps),
+      weekdayIndex,
+      isWeekend: weekdayIndex === 0 || weekdayIndex === 6,
+      isPartial: key === generatedDay
+    }
+  })
+
+  // The partial day is excluded so the average does not droop at the right edge.
+  const complete = days.filter(day => !day.isPartial)
+  days.forEach((day, index) => {
+    const window = days.slice(Math.max(0, index - MA_WINDOW + 1), index + 1)
+    day.average = (!day.isPartial && window.length === MA_WINDOW && window.every(d => !d.isPartial))
+      ? window.reduce((sum, d) => sum + d.requests, 0) / MA_WINDOW
+      : null
+  })
+
+  const weekdays = complete.filter(day => !day.isWeekend)
+  const weekends = complete.filter(day => day.isWeekend)
+  const mean = rows => rows.length ? rows.reduce((sum, d) => sum + d.requests, 0) / rows.length : 0
+
+  return {
+    days,
+    complete,
+    generatedAt: raw.generatedAt,
+    lookbackDays: toNumber(raw.lookbackDays) || 30,
+    weekdayMean: mean(weekdays),
+    weekendMean: mean(weekends)
+  }
+}
+
+function drawPanel(svg, model, options) {
+  const { plotTop, plotHeight, values, accessor, showXAxis, xAxisBand, axisTitle } = options
+  const baseline = plotTop + plotHeight
+  svg.textContent = ''
+
+  const n = model.days.length
+  const band = PLOT_W / Math.max(n, 1)
+  const scale = niceScale(Math.max(...values, 1))
+  const y = value => baseline - (value / scale.max) * plotHeight
+
+  // Weekend bands sit behind everything, in a recessive surface tint.
+  model.days.forEach((day, index) => {
+    if (!day.isWeekend) return
+    svg.appendChild(el('rect', {
+      class: 'weekend-band', x: ML + band * index, y: plotTop - 4,
+      width: band, height: plotHeight + 4
+    }))
+  })
+
+  scale.ticks.forEach(tick => {
+    const ty = y(tick)
+    svg.appendChild(el('line', { class: tick === 0 ? 'baseline' : 'grid-line', x1: ML, x2: ML + PLOT_W, y1: ty, y2: ty }))
+    const label = el('text', { class: 'tick-text', x: ML - 8, y: ty + 4, 'text-anchor': 'end' })
+    label.textContent = tick >= 1000 ? `${numberFormat.format(tick / 1000)}k` : numberFormat.format(tick)
+    svg.appendChild(label)
+  })
+
+  // Left-aligned inside the viewBox: an end-anchored title overflows left and gets clipped by .plot-scroll.
+  const title = el('text', { class: 'axis-title', x: 2, y: plotTop - 8, 'text-anchor': 'start' })
+  title.textContent = axisTitle
+  svg.appendChild(title)
+
+  options.draw({ svg, model, band, y, baseline, plotTop, plotHeight })
+
+  if (showXAxis) {
+    // Stride from the available band so labels never collide. "25 Sept" needs ~50 viewBox units.
+    const stride = Math.max(1, Math.ceil(50 / band))
+    model.days.forEach((day, index) => {
+      const isLast = index === n - 1
+      if (index % stride !== 0 && !isLast) return
+      // Drop a strided label that would crowd the always-drawn last one.
+      if (!isLast && (n - 1 - index) * band < 50) return
+      const cx = ML + band * (index + 0.5)
+      const label = el('text', { class: 'tick-text', x: cx, y: baseline + xAxisBand - 18, 'text-anchor': 'middle' })
+      label.textContent = dayFormat.format(day.date)
+      svg.appendChild(label)
+      if (day.isPartial) {
+        const sub = el('text', { class: 'partial-note', x: cx, y: baseline + xAxisBand - 6, 'text-anchor': 'middle' })
+        sub.textContent = 'partial'
+        svg.appendChild(sub)
+      }
+    })
+  }
+
+  const crosshair = el('line', { class: 'crosshair', x1: 0, x2: 0, y1: plotTop - 4, y2: baseline })
+  crosshair.setAttribute('hidden', '')
+  svg.appendChild(crosshair)
+  return { crosshair, band, y, baseline, accessor }
+}
+
+function drawRequests({ svg, model, band, y, baseline }) {
+  const width = Math.min(BAR_MAX, band - 8)
+  const peak = model.days.reduce((best, day) => (day.requests > best.requests ? day : best), model.days[0])
+
+  model.days.forEach((day, index) => {
+    const x = ML + band * (index + 0.5) - width / 2
+    const top = y(day.requests)
+    const path = el('path', {
+      d: columnPath(x, top, width, baseline - top, BAR_RADIUS),
+      fill: day.isPartial ? 'color-mix(in srgb, var(--series-requests) 22%, transparent)' : 'var(--series-requests)'
+    })
+    if (day.isPartial) {
+      path.setAttribute('stroke', 'var(--series-requests)')
+      path.setAttribute('stroke-width', '2')
+    }
+    svg.appendChild(path)
+  })
+
+  const points = model.days
+    .map((day, index) => (day.average === null ? null : `${ML + band * (index + 0.5)},${y(day.average)}`))
+    .filter(Boolean)
+  if (points.length > 1) {
+    svg.appendChild(el('polyline', {
+      points: points.join(' '), fill: 'none', stroke: 'var(--series-average)',
+      'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    }))
+  }
+
+  // Selective direct label: the extreme only. The axis and tooltip carry the rest.
+  const peakIndex = model.days.indexOf(peak)
+  const label = el('text', {
+    class: 'direct-label', x: ML + band * (peakIndex + 0.5), y: y(peak.requests) - 7, 'text-anchor': 'middle',
+    stroke: 'var(--chart-surface)', 'stroke-width': 3, 'paint-order': 'stroke'
+  })
+  label.textContent = numberFormat.format(peak.requests)
+  svg.appendChild(label)
+}
+
+function drawIps({ svg, model, band, y, baseline }) {
+  const coords = model.days.map((day, index) => [ML + band * (index + 0.5), y(day.ips)])
+  const line = coords.map(([x, py]) => `${x},${py}`).join(' ')
+
+  svg.appendChild(el('polygon', {
+    points: `${coords[0][0]},${baseline} ${line} ${coords[coords.length - 1][0]},${baseline}`,
+    fill: 'var(--series-ips)', 'fill-opacity': .1
+  }))
+  svg.appendChild(el('polyline', {
+    points: line, fill: 'none', stroke: 'var(--series-ips)',
+    'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+  }))
+
+  const [ex, ey] = coords[coords.length - 1]
+  svg.appendChild(el('circle', { cx: ex, cy: ey, r: 4, fill: 'var(--series-ips)', stroke: 'var(--chart-surface)', 'stroke-width': 2 }))
+
+  // Direct label at the line end: clear of the dot, anchored inboard so it cannot overflow the viewBox.
+  const label = el('text', {
+    class: 'direct-label', x: ex + 2, y: ey - 14, 'text-anchor': 'end',
+    stroke: 'var(--chart-surface)', 'stroke-width': 3, 'paint-order': 'stroke'
+  })
+  label.textContent = numberFormat.format(model.days[model.days.length - 1].ips)
+  svg.appendChild(label)
+}
+
+function renderTable(model) {
+  const tbody = document.querySelector('#trend-table tbody')
+  const tfoot = document.querySelector('#trend-table tfoot')
+  tbody.textContent = ''
+  tfoot.textContent = ''
+
+  for (const day of model.days) {
+    const tr = document.createElement('tr')
+    const cells = [
+      [fullDayFormat.format(day.date), false],
+      [WEEKDAY[day.weekdayIndex] + (day.isWeekend ? ' (weekend)' : ''), false],
+      [numberFormat.format(day.requests) + (day.isPartial ? ' (partial)' : ''), true],
+      [day.average === null ? '-' : numberFormat.format(Math.round(day.average)), true],
+      [numberFormat.format(day.ips), true],
+      [day.ips ? oneDecimal.format(day.requests / day.ips) : '-', true]
+    ]
+    for (const [text, isCount] of cells) {
+      const td = document.createElement('td')
+      if (isCount) td.className = 'count'
+      td.textContent = text
+      tr.appendChild(td)
+    }
+    tbody.appendChild(tr)
+  }
+
+  const totalRequests = model.days.reduce((sum, day) => sum + day.requests, 0)
+  const tr = document.createElement('tr')
+  const footCells = [
+    [`${model.days.length} days`, false],
+    ['', false],
+    [numberFormat.format(totalRequests), true],
+    ['', true],
+    ['', true],
+    ['', true]
+  ]
+  for (const [text, isCount] of footCells) {
+    const td = document.createElement('td')
+    if (isCount) td.className = 'count'
+    td.textContent = text
+    tr.appendChild(td)
+  }
+  tfoot.appendChild(tr)
+}
+
+function setupInteraction(model, panels) {
+  const chart = document.getElementById('chart')
+  const tooltip = document.getElementById('tooltip')
+  const live = document.getElementById('chart-live')
+  const svgRequests = document.getElementById('svg-requests')
+  let active = -1
+
+  const show = index => {
+    if (index < 0 || index >= model.days.length) return
+    active = index
+    const day = model.days[index]
+    const band = PLOT_W / model.days.length
+    const vbX = ML + band * (index + 0.5)
+
+    for (const panel of panels) {
+      panel.crosshair.setAttribute('x1', vbX)
+      panel.crosshair.setAttribute('x2', vbX)
+      panel.crosshair.removeAttribute('hidden')
+    }
+
+    tooltip.textContent = ''
+    const heading = document.createElement('div')
+    heading.className = 'tip-date'
+    heading.textContent = fullDayFormat.format(day.date)
+    tooltip.appendChild(heading)
+
+    const rows = [
+      ['Requests', numberFormat.format(day.requests), 'var(--series-requests)'],
+      ['7-day average', day.average === null ? 'not yet available' : numberFormat.format(Math.round(day.average)), 'var(--series-average)'],
+      ['Unique IPs', numberFormat.format(day.ips), 'var(--series-ips)']
+    ]
+    for (const [name, value, colour] of rows) {
+      const row = document.createElement('div')
+      row.className = 'tip-row'
+      const label = document.createElement('span')
+      label.className = 'tip-name'
+      const key = document.createElement('i')
+      key.className = 'key-line'
+      key.style.background = colour
+      label.appendChild(key)
+      label.appendChild(document.createTextNode(name))
+      const amount = document.createElement('span')
+      amount.className = 'tip-value'
+      amount.textContent = value
+      row.appendChild(label)
+      row.appendChild(amount)
+      tooltip.appendChild(row)
+    }
+    if (day.isPartial) {
+      const flag = document.createElement('div')
+      flag.className = 'tip-flag'
+      flag.textContent = 'Partial day - collection stopped mid-day'
+      tooltip.appendChild(flag)
+    }
+
+    tooltip.hidden = false
+    const rect = svgRequests.getBoundingClientRect()
+    const chartRect = chart.getBoundingClientRect()
+    const pixelX = rect.left - chartRect.left + (vbX / VB_W) * rect.width
+    const width = tooltip.offsetWidth
+    const left = Math.min(Math.max(pixelX - width / 2, 4), chart.clientWidth - width - 4)
+    tooltip.style.left = `${left}px`
+    tooltip.style.top = `${rect.top - chartRect.top + 8}px`
+
+    live.textContent = `${fullDayFormat.format(day.date)}: ${numberFormat.format(day.requests)} requests, ${numberFormat.format(day.ips)} unique IPs${day.isPartial ? ', partial day' : ''}`
+  }
+
+  const hide = () => {
+    active = -1
+    tooltip.hidden = true
+    for (const panel of panels) panel.crosshair.setAttribute('hidden', '')
+  }
+
+  const indexFromEvent = event => {
+    const rect = svgRequests.getBoundingClientRect()
+    const vbX = ((event.clientX - rect.left) / rect.width) * VB_W
+    const band = PLOT_W / model.days.length
+    return Math.floor((vbX - ML) / band)
+  }
+
+  chart.addEventListener('pointermove', event => {
+    const index = indexFromEvent(event)
+    if (index < 0 || index >= model.days.length) return hide()
+    if (index !== active) show(index)
+  })
+  chart.addEventListener('pointerleave', hide)
+  chart.addEventListener('blur', hide)
+  chart.addEventListener('keydown', event => {
+    if (event.key === 'ArrowRight') { event.preventDefault(); show(Math.min((active < 0 ? -1 : active) + 1, model.days.length - 1)) }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); show(Math.max((active < 0 ? model.days.length : active) - 1, 0)) }
+    else if (event.key === 'Home') { event.preventDefault(); show(0) }
+    else if (event.key === 'End') { event.preventDefault(); show(model.days.length - 1) }
+    else if (event.key === 'Escape') hide()
+  })
+}
+
+function render(raw) {
+  const model = buildModel(raw)
+  if (!model.days.length) {
+    document.getElementById('lede').textContent = 'No daily traffic data available.'
+    return
+  }
+
+  const requestsPanel = drawPanel(document.getElementById('svg-requests'), model, {
+    plotTop: 26, plotHeight: 130, xAxisBand: 0, showXAxis: false,
+    axisTitle: 'Requests', values: model.days.map(day => day.requests), draw: drawRequests
+  })
+  const ipsPanel = drawPanel(document.getElementById('svg-ips'), model, {
+    plotTop: 26, plotHeight: 100, xAxisBand: 42, showXAxis: true,
+    axisTitle: 'Unique IPs', values: model.days.map(day => day.ips), draw: drawIps
+  })
+
+  setupInteraction(model, [requestsPanel, ipsPanel])
+  renderTable(model)
+
+  const first = model.days[0]
+  const last = model.days[model.days.length - 1]
+  document.getElementById('lede').textContent =
+    `Observed ${fullDayFormat.format(first.date)} to ${fullDayFormat.format(last.date)} UTC - ` +
+    `${model.days.length} of ${model.lookbackDays} requested days - ` +
+    `generated ${new Date(model.generatedAt).toLocaleString()}`
+
+  const delta = model.weekdayMean ? (model.weekendMean - model.weekdayMean) / model.weekdayMean : 0
+  const readout = document.getElementById('readout')
+  readout.textContent = ''
+  readout.appendChild(document.createTextNode('Weekdays average '))
+  const a = document.createElement('strong')
+  a.textContent = `${numberFormat.format(Math.round(model.weekdayMean))} requests/day`
+  readout.appendChild(a)
+  readout.appendChild(document.createTextNode('; weekends average '))
+  const b = document.createElement('strong')
+  b.textContent = `${numberFormat.format(Math.round(model.weekendMean))} (${oneDecimal.format(delta * 100)}%)`
+  readout.appendChild(b)
+  readout.appendChild(document.createTextNode('. Complete days only; the partial final day is excluded from both averages and from the 7-day line.'))
+}
+
+async function init() {
+  let raw = FALLBACK
+  try {
+    const response = await fetch('../dist/data.json', { cache: 'no-store' })
+    if (response.ok) {
+      const data = await response.json()
+      if (Array.isArray(data.trend) && data.trend.length) raw = data
+    }
+  } catch (error) {
+    // file:// or offline - the inlined snapshot already covers it.
+  }
+  render(raw)
+  window.addEventListener('resize', () => render(raw), { passive: true })
+}
+
+init()
+</script>
+</body>
+</html>

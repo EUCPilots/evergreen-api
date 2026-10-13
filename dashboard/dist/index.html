@@ -20,6 +20,11 @@
       --accent-soft: #dff3eb;
       --warning: #a44318;
       --warning-soft: #fff0e8;
+      /* Chart roles. Series validated for CVD/contrast: --accent #087f5b and --chart-ips #2a78d6 on #fff. */
+      --grid: #e6ebe7;
+      --band: #f2f5f2;
+      --chart-ips: #2a78d6;
+      --chart-average: #4a5a50;
     }
     body { color: var(--ink); background: #fff; }
     main.container { padding-top: 2rem; padding-bottom: 4rem; }
@@ -100,21 +105,41 @@
     .trend-down { color: var(--warning); }
     #trending-section[hidden], #trending-link[hidden], #trending-unavailable[hidden] { display: none; }
     .coverage-note, .section-note { color: var(--muted); font-size: .82rem; margin: .5rem 0 1rem; }
-    .overview { border-bottom: 1px solid var(--line); padding: .75rem 0 1rem; }
-    .overview h3 { font-size: .9rem; margin: 0 0 .8rem; }
-    .overview p { color: var(--muted); font-size: .78rem; margin: .8rem 0 0; }
-    .chart-legend { color: var(--muted); display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; font-size: .75rem; margin-bottom: .85rem; }
-    .chart-legend .requests-key::before, .chart-legend .ips-key::before { content: ''; display: inline-block; width: .7rem; height: .7rem; margin-right: .35rem; background: var(--accent); }
-    .chart-legend .ips-key::before { background: var(--warning); }
-    .daily-bars { display: grid; gap: 1rem; }
-    .daily-bar { display: grid; grid-template-columns: 11rem minmax(5rem, 1fr) 9rem; gap: .8rem; align-items: center; font-size: .78rem; }
-    .daily-label { white-space: nowrap; }
-    .daily-values { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .bar-pair { display: grid; gap: 3px; }
-    .bar-track { display: block; height: .5rem; background: var(--surface); }
-    .bar-track > span { display: block; height: 100%; }
-    .request-bar { background: var(--accent); }
-    .ip-bar { background: var(--warning); }
+    .chart { background: #fff; border: 1px solid var(--line); border-radius: 6px; margin-bottom: .5rem; padding: 1rem 1rem .5rem; position: relative; }
+    .chart:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .plot-scroll { overflow-x: auto; overflow-y: hidden; }
+    .plot-inner { min-width: 660px; }
+    .chart svg { display: block; height: auto; width: 100%; }
+    .panel + .panel { margin-top: .4rem; }
+    .panel-head { align-items: baseline; display: flex; flex-wrap: wrap; gap: .25rem 1rem; justify-content: space-between; margin: 0 0 .2rem; }
+    .panel-head h3 { font-size: .85rem; font-weight: 700; margin: 0; }
+    .panel-sub { color: var(--muted); font-size: .76rem; }
+    .legend { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: .76rem; gap: .3rem 1rem; }
+    .legend span { align-items: center; display: inline-flex; gap: .4rem; }
+    .legend i { display: inline-block; }
+    .key-rect { background: var(--accent); border-radius: 2px; height: .7rem; width: .7rem; }
+    .key-line { background: var(--chart-average); border-radius: 1px; height: 2px; width: 1rem; }
+    .key-partial { border: 2px solid var(--accent); border-radius: 2px; height: .7rem; width: .7rem; }
+    .key-band { background: var(--band); border: 1px solid var(--line); border-radius: 2px; height: .7rem; width: .7rem; }
+    .tick-text { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .axis-title { fill: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .grid-line { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+    .baseline-rule { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+    .weekend-band { fill: var(--band); }
+    .direct-label { fill: var(--ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .partial-note { fill: var(--muted); font-size: 11px; }
+    .crosshair { opacity: .35; pointer-events: none; stroke: var(--ink); stroke-width: 1; }
+    .crosshair[hidden] { display: none; }
+    .chart-tooltip { background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px #17211b24; font-size: .8rem; min-width: 11rem; padding: .55rem .7rem; pointer-events: none; position: absolute; z-index: 5; }
+    .chart-tooltip[hidden] { display: none; }
+    .tip-date { font-weight: 700; margin-bottom: .35rem; }
+    .tip-row { align-items: center; display: flex; gap: .5rem; justify-content: space-between; }
+    .tip-row + .tip-row { margin-top: .15rem; }
+    .tip-name { align-items: center; color: var(--muted); display: inline-flex; gap: .4rem; }
+    .tip-value { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .tip-flag { color: var(--warning); font-size: .72rem; margin-top: .35rem; }
+    .chart-empty[hidden] { display: none; }
+    .visually-hidden { clip: rect(0 0 0 0); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
     @media (max-width: 700px) {
       main.container { padding-top: 1rem; }
       .masthead, .controls { align-items: stretch; flex-direction: column; }
@@ -128,10 +153,6 @@
       .burst-metric:nth-last-child(-n+2) { display: none; }
       .burst-window { grid-template-columns: 1fr auto; padding-left: 1rem; }
       .burst-window span:nth-child(3) { display: none; }
-      .daily-bar { grid-template-columns: minmax(0, 1fr) auto; gap: .25rem .5rem; }
-      .daily-bar .bar-pair { grid-column: 1 / -1; grid-row: 2; }
-      .top-path { grid-template-columns: minmax(0, 1fr) auto auto; }
-      .top-path .bar-track { grid-column: 1 / -1; grid-row: 2; }
     }
   </style>
 </head>
@@ -174,8 +195,37 @@
         <button type="button" role="tab" id="connectingIps-tab" aria-controls="connectingIps-panel" aria-selected="false" tabindex="-1">Requests by connecting IP</button>
       </div>
       <section id="trend-panel" role="tabpanel" aria-labelledby="trend-tab" tabindex="0">
-      <div class="section-heading" id="table-trend" data-table="trend"><div class="heading-text"><h2>Daily traffic trend</h2><p>Overall requests and unique connecting IPs per day, independent of the filter</p></div></div>
-      <div id="daily-chart" class="overview" role="img" aria-label="Daily requests and unique connecting IPs, with values per day"></div>
+      <div class="section-heading" id="table-trend" data-table="trend"><div class="heading-text"><h2>Daily traffic trend</h2><p>Requests and unique connecting IPs per UTC day</p></div></div>
+      <div class="chart" id="daily-chart" tabindex="0" role="application" aria-label="Daily requests and unique connecting IPs. Use left and right arrow keys to step through days; the table below lists every value.">
+        <p class="visually-hidden" id="chart-live" aria-live="polite"></p>
+        <div class="plot-scroll">
+          <div class="plot-inner">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Requests per day</h3>
+                <div class="legend">
+                  <span><i class="key-rect"></i>Requests</span>
+                  <span><i class="key-line"></i>7-day average</span>
+                  <span><i class="key-partial"></i>Partial day</span>
+                  <span><i class="key-band"></i>Weekend</span>
+                </div>
+              </div>
+              <svg id="svg-requests" viewBox="0 0 920 180" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Column chart of requests per day"></svg>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Unique connecting IPs per day</h3>
+                <span class="panel-sub">Scaled independently of the panel above</span>
+              </div>
+              <svg id="svg-ips" viewBox="0 0 920 168" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Line chart of unique connecting IPs per day"></svg>
+            </div>
+          </div>
+        </div>
+        <p class="empty chart-empty" id="chart-empty" hidden>No matching data</p>
+        <div class="chart-tooltip" id="chart-tooltip" hidden></div>
+      </div>
+      <p class="section-note" id="trend-readout"></p>
+      <figure data-table="trend"></figure>
       </section>
       <section id="paths-panel" role="tabpanel" aria-labelledby="paths-tab" tabindex="0" hidden>
       <div class="section-heading" id="table-paths" data-table="paths"><div class="heading-text"><h2>Requests by path</h2><p>Which Evergreen applications and endpoints are most used</p></div></div>

@@ -1,12 +1,16 @@
 const state = {
   data: null,
   filter: '',
-  sort: {}
+  sort: {},
+  chart: { days: [], panels: [] }
 }
 
 const numberFormat = new Intl.NumberFormat()
 const percentFormat = new Intl.NumberFormat(undefined, { style: 'percent', maximumFractionDigits: 1 })
+const oneDecimalFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
 const utcDateFormat = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' })
+const chartDayFormat = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' })
+const chartFullDayFormat = new Intl.DateTimeFormat(undefined, { timeZone: 'UTC', weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
 
 function formatShare(share) {
   return share > 0 && share < 0.001 ? '<0.1%' : percentFormat.format(share)
@@ -69,8 +73,11 @@ const TABLES = {
     file: 'daily-traffic-trend',
     columns: [
       { key: 'day', label: 'Day', type: 'date', width: '11rem' },
+      { key: 'weekdayName', label: 'Weekday', width: '13rem' },
       { key: 'count', label: 'Requests', type: 'count' },
-      { key: 'uniqueConnectingIps', label: 'Unique IPs', type: 'count' }
+      { key: 'average', label: '7-day average', type: 'count', width: '11rem' },
+      { key: 'uniqueConnectingIps', label: 'Unique IPs', type: 'count' },
+      { key: 'requestsPerIp', label: 'Requests per IP', type: 'decimal', width: '11rem' }
     ]
   },
   clientFamilies: {
@@ -109,7 +116,7 @@ function escapeHtml(value) {
 }
 
 function isNumeric(column) {
-  return column.type === 'count' || column.type === 'share' || column.type === 'trendDelta'
+  return column.type === 'count' || column.type === 'share' || column.type === 'trendDelta' || column.type === 'decimal'
 }
 
 function trendDelta(row) {
@@ -120,7 +127,10 @@ function trendDelta(row) {
 
 function cellText(column, row) {
   const value = row[column.key]
+  // Only the trend table carries nullable measures (no 7-day average until 7 complete days exist).
+  if ((column.type === 'count' || column.type === 'decimal') && (value === null || value === undefined || value === '')) return '\u2014'
   if (column.type === 'count') return numberFormat.format(Number(value) || 0)
+  if (column.type === 'decimal') return oneDecimalFormat.format(Number(value) || 0)
   if (column.type === 'timestamp') return value ? new Date(`${value}Z`).toLocaleString() : ''
   if (column.type === 'date') return value ? new Date(`${value}Z`).toLocaleDateString() : ''
   if (column.type === 'trendDelta') {
@@ -239,26 +249,352 @@ function utcDay(value) {
   return utcDateFormat.format(new Date(`${String(value).slice(0, 10)}T00:00:00Z`))
 }
 
-function renderDailyChart() {
-  const container = document.getElementById('daily-chart')
-  const rows = state.data.trend || []
-  if (!rows.length) {
-    container.textContent = 'No daily traffic data available.'
+// --- Daily traffic chart ----------------------------------------------------
+// Two panels sharing one time axis. Requests and unique IPs are on different
+// scales, so they get a panel each: a single plot with two y-axes would imply a
+// correlation that is not in the data.
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const VB_W = 920
+const CHART_ML = 56
+const CHART_MR = 18
+const CHART_PLOT_W = VB_W - CHART_ML - CHART_MR
+const MA_WINDOW = 7
+const BAR_MAX = 24
+const BAR_RADIUS = 4
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+function svgEl(name, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, name)
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value))
+  return node
+}
+
+function trendDate(row) {
+  return new Date(`${String(row.day).slice(0, 10)}T00:00:00Z`)
+}
+
+// Adds weekday, partial-day and 7-day average fields so the chart and the trend
+// table (and its CSV export) all read the same derived values.
+function enrichTrend(data) {
+  const generatedDay = String(data.generatedAt || '').slice(0, 10)
+  const rows = data.trend || []
+
+  for (const row of rows) {
+    const weekdayIndex = trendDate(row).getUTCDay()
+    const requests = Number(row.count) || 0
+    const ips = Number(row.uniqueConnectingIps) || 0
+    const tags = []
+    row.weekdayIndex = weekdayIndex
+    row.isWeekend = weekdayIndex === 0 || weekdayIndex === 6
+    row.isPartial = String(row.day).slice(0, 10) === generatedDay
+    if (row.isWeekend) tags.push('weekend')
+    if (row.isPartial) tags.push('partial day')
+    row.weekdayName = WEEKDAY_NAMES[weekdayIndex] + (tags.length ? ` (${tags.join(', ')})` : '')
+    row.requestsPerIp = ips ? requests / ips : null
+  }
+
+  // The partial final day is excluded so the average does not droop at the right edge.
+  rows.forEach((row, index) => {
+    const window = rows.slice(Math.max(0, index - MA_WINDOW + 1), index + 1)
+    row.average = (!row.isPartial && window.length === MA_WINDOW && window.every(entry => !entry.isPartial))
+      ? Math.round(window.reduce((sum, entry) => sum + (Number(entry.count) || 0), 0) / MA_WINDOW)
+      : null
+  })
+}
+
+function niceScale(max, tickCount = 4) {
+  if (!(max > 0)) return { max: 1, ticks: [0, 1] }
+  const rough = max / tickCount
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rough)))
+  const normalised = rough / magnitude
+  const step = (normalised <= 1 ? 1 : normalised <= 2 ? 2 : normalised <= 2.5 ? 2.5 : normalised <= 5 ? 5 : 10) * magnitude
+  const niceMax = Math.ceil(max / step) * step
+  const ticks = []
+  for (let value = 0; value <= niceMax + step / 1000; value += step) ticks.push(value)
+  return { max: niceMax, ticks }
+}
+
+// Square at the baseline, rounded at the data end.
+function columnPath(x, y, width, height, radius) {
+  if (height <= 0) return ''
+  const r = Math.min(radius, width / 2, height)
+  const bottom = y + height
+  return `M${x} ${bottom} L${x} ${y + r} Q${x} ${y} ${x + r} ${y} L${x + width - r} ${y} Q${x + width} ${y} ${x + width} ${y + r} L${x + width} ${bottom} Z`
+}
+
+function drawChartPanel(svg, days, options) {
+  const { plotTop, plotHeight, values, showXAxis, xAxisBand, axisTitle } = options
+  const baseline = plotTop + plotHeight
+  svg.textContent = ''
+
+  const count = days.length
+  const band = CHART_PLOT_W / Math.max(count, 1)
+  const scale = niceScale(Math.max(...values, 1))
+  const y = value => baseline - (value / scale.max) * plotHeight
+
+  days.forEach((day, index) => {
+    if (!day.isWeekend) return
+    svg.appendChild(svgEl('rect', {
+      class: 'weekend-band', x: CHART_ML + band * index, y: plotTop - 4, width: band, height: plotHeight + 4
+    }))
+  })
+
+  for (const tick of scale.ticks) {
+    const ty = y(tick)
+    svg.appendChild(svgEl('line', {
+      class: tick === 0 ? 'baseline-rule' : 'grid-line', x1: CHART_ML, x2: CHART_ML + CHART_PLOT_W, y1: ty, y2: ty
+    }))
+    const label = svgEl('text', { class: 'tick-text', x: CHART_ML - 8, y: ty + 4, 'text-anchor': 'end' })
+    label.textContent = tick >= 1000 ? `${numberFormat.format(tick / 1000)}k` : numberFormat.format(tick)
+    svg.appendChild(label)
+  }
+
+  // Left-aligned inside the viewBox: an end-anchored title overflows and gets clipped by .plot-scroll.
+  const title = svgEl('text', { class: 'axis-title', x: 2, y: plotTop - 8, 'text-anchor': 'start' })
+  title.textContent = axisTitle
+  svg.appendChild(title)
+
+  options.draw({ svg, days, band, y, baseline })
+
+  if (showXAxis) {
+    // Stride from the available band so labels never collide.
+    const stride = Math.max(1, Math.ceil(50 / band))
+    days.forEach((day, index) => {
+      const isLast = index === count - 1
+      if (index % stride !== 0 && !isLast) return
+      if (!isLast && (count - 1 - index) * band < 50) return
+      const cx = CHART_ML + band * (index + 0.5)
+      const label = svgEl('text', { class: 'tick-text', x: cx, y: baseline + xAxisBand - 18, 'text-anchor': 'middle' })
+      label.textContent = chartDayFormat.format(trendDate(day))
+      svg.appendChild(label)
+      if (day.isPartial) {
+        const note = svgEl('text', { class: 'partial-note', x: cx, y: baseline + xAxisBand - 6, 'text-anchor': 'middle' })
+        note.textContent = 'partial'
+        svg.appendChild(note)
+      }
+    })
+  }
+
+  const crosshair = svgEl('line', { class: 'crosshair', x1: 0, x2: 0, y1: plotTop - 4, y2: baseline })
+  crosshair.setAttribute('hidden', '')
+  svg.appendChild(crosshair)
+  return { crosshair }
+}
+
+function drawRequestsPanel({ svg, days, band, y, baseline }) {
+  const width = Math.min(BAR_MAX, Math.max(band - 8, 2))
+
+  days.forEach((day, index) => {
+    const requests = Number(day.count) || 0
+    const x = CHART_ML + band * (index + 0.5) - width / 2
+    const top = y(requests)
+    const path = svgEl('path', {
+      d: columnPath(x, top, width, baseline - top, BAR_RADIUS),
+      fill: day.isPartial ? 'color-mix(in srgb, var(--accent) 22%, transparent)' : 'var(--accent)'
+    })
+    if (day.isPartial) {
+      path.setAttribute('stroke', 'var(--accent)')
+      path.setAttribute('stroke-width', '2')
+    }
+    svg.appendChild(path)
+  })
+
+  const points = days
+    .map((day, index) => (day.average === null || day.average === undefined ? null : `${CHART_ML + band * (index + 0.5)},${y(day.average)}`))
+    .filter(Boolean)
+  if (points.length > 1) {
+    svg.appendChild(svgEl('polyline', {
+      points: points.join(' '), fill: 'none', stroke: 'var(--chart-average)',
+      'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    }))
+  }
+
+  // Selective direct label: the extreme only. The axis, tooltip and table carry the rest.
+  const peak = days.reduce((best, day) => ((Number(day.count) || 0) > (Number(best.count) || 0) ? day : best), days[0])
+  const peakIndex = days.indexOf(peak)
+  const label = svgEl('text', {
+    class: 'direct-label', x: CHART_ML + band * (peakIndex + 0.5), y: y(Number(peak.count) || 0) - 7,
+    'text-anchor': 'middle', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke'
+  })
+  label.textContent = numberFormat.format(Number(peak.count) || 0)
+  svg.appendChild(label)
+}
+
+function drawIpsPanel({ svg, days, band, y, baseline }) {
+  const coords = days.map((day, index) => [CHART_ML + band * (index + 0.5), y(Number(day.uniqueConnectingIps) || 0)])
+  const line = coords.map(([x, py]) => `${x},${py}`).join(' ')
+
+  svg.appendChild(svgEl('polygon', {
+    points: `${coords[0][0]},${baseline} ${line} ${coords[coords.length - 1][0]},${baseline}`,
+    fill: 'var(--chart-ips)', 'fill-opacity': .1
+  }))
+  svg.appendChild(svgEl('polyline', {
+    points: line, fill: 'none', stroke: 'var(--chart-ips)',
+    'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+  }))
+
+  const [ex, ey] = coords[coords.length - 1]
+  svg.appendChild(svgEl('circle', { cx: ex, cy: ey, r: 4, fill: 'var(--chart-ips)', stroke: '#fff', 'stroke-width': 2 }))
+
+  const label = svgEl('text', {
+    class: 'direct-label', x: ex + 2, y: ey - 14, 'text-anchor': 'end',
+    stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke'
+  })
+  label.textContent = numberFormat.format(Number(days[days.length - 1].uniqueConnectingIps) || 0)
+  svg.appendChild(label)
+}
+
+function renderTrendReadout(days) {
+  const readout = document.getElementById('trend-readout')
+  if (!readout) return
+  const complete = days.filter(day => !day.isPartial)
+  const mean = rows => (rows.length ? rows.reduce((sum, day) => sum + (Number(day.count) || 0), 0) / rows.length : 0)
+  const weekdayMean = mean(complete.filter(day => !day.isWeekend))
+  const weekendMean = mean(complete.filter(day => day.isWeekend))
+
+  if (!weekdayMean || !weekendMean) {
+    readout.textContent = ''
     return
   }
-  const maxRequests = Math.max(1, ...rows.map(row => Number(row.count) || 0))
-  const maxIps = Math.max(1, ...rows.map(row => Number(row.uniqueConnectingIps) || 0))
-  const generatedDay = state.data.generatedAt?.slice(0, 10)
-  container.innerHTML = `<div class="chart-legend"><span class="requests-key">Requests</span><span class="ips-key">Unique IPs</span><span>Separate scales per series · UTC days</span></div>` +
-    `<div class="daily-bars">${rows.map(row => {
-      const requests = Number(row.count) || 0
-      const ips = Number(row.uniqueConnectingIps) || 0
-      const current = String(row.day).slice(0, 10) === generatedDay
-      return `<div class="daily-bar"><span class="daily-label">${escapeHtml(utcDay(row.day))}${current ? ' · in progress' : ''}</span>` +
-        `<div class="bar-pair"><span class="bar-track"><span class="request-bar" style="width:${requests / maxRequests * 100}%"></span></span>` +
-        `<span class="bar-track"><span class="ip-bar" style="width:${ips / maxIps * 100}%"></span></span></div>` +
-        `<span class="daily-values">${numberFormat.format(requests)} / ${numberFormat.format(ips)}</span></div>`
-    }).join('')}</div>`
+  const delta = (weekendMean - weekdayMean) / weekdayMean
+  readout.textContent =
+    `Weekdays average ${numberFormat.format(Math.round(weekdayMean))} requests/day; weekends average ` +
+    `${numberFormat.format(Math.round(weekendMean))} (${percentFormat.format(delta)}). Complete days only; ` +
+    `the partial final day is excluded from both averages and from the 7-day line.`
+}
+
+function renderDailyChart() {
+  const svgRequests = document.getElementById('svg-requests')
+  const svgIps = document.getElementById('svg-ips')
+  const empty = document.getElementById('chart-empty')
+  if (!svgRequests || !svgIps) return
+
+  // Filtered like every other section, but always chronological - a table sort must not reorder time.
+  const days = applyFilter(state.data.trend || [])
+    .slice()
+    .sort((left, right) => String(left.day).localeCompare(String(right.day)))
+
+  state.chart = { days, panels: [] }
+
+  if (!days.length) {
+    svgRequests.textContent = ''
+    svgIps.textContent = ''
+    empty.hidden = false
+    renderTrendReadout(days)
+    return
+  }
+  empty.hidden = true
+
+  state.chart.panels = [
+    drawChartPanel(svgRequests, days, {
+      plotTop: 26, plotHeight: 130, xAxisBand: 0, showXAxis: false, axisTitle: 'Requests',
+      values: days.map(day => Number(day.count) || 0), draw: drawRequestsPanel
+    }),
+    drawChartPanel(svgIps, days, {
+      plotTop: 26, plotHeight: 100, xAxisBand: 42, showXAxis: true, axisTitle: 'Unique IPs',
+      values: days.map(day => Number(day.uniqueConnectingIps) || 0), draw: drawIpsPanel
+    })
+  ]
+
+  renderTrendReadout(days)
+}
+
+function setupChartInteraction() {
+  const chart = document.getElementById('daily-chart')
+  const tooltip = document.getElementById('chart-tooltip')
+  const live = document.getElementById('chart-live')
+  const svgRequests = document.getElementById('svg-requests')
+  if (!chart || !tooltip || !svgRequests) return
+  let active = -1
+
+  const hide = () => {
+    active = -1
+    tooltip.hidden = true
+    for (const panel of state.chart.panels) panel.crosshair.setAttribute('hidden', '')
+  }
+
+  const show = index => {
+    const days = state.chart.days
+    if (index < 0 || index >= days.length) return
+    active = index
+    const day = days[index]
+    const band = CHART_PLOT_W / days.length
+    const vbX = CHART_ML + band * (index + 0.5)
+
+    for (const panel of state.chart.panels) {
+      panel.crosshair.setAttribute('x1', vbX)
+      panel.crosshair.setAttribute('x2', vbX)
+      panel.crosshair.removeAttribute('hidden')
+    }
+
+    tooltip.textContent = ''
+    const heading = document.createElement('div')
+    heading.className = 'tip-date'
+    heading.textContent = chartFullDayFormat.format(trendDate(day))
+    tooltip.appendChild(heading)
+
+    const rows = [
+      ['Requests', numberFormat.format(Number(day.count) || 0), 'var(--accent)'],
+      ['7-day average', day.average === null || day.average === undefined ? 'not yet available' : numberFormat.format(day.average), 'var(--chart-average)'],
+      ['Unique IPs', numberFormat.format(Number(day.uniqueConnectingIps) || 0), 'var(--chart-ips)']
+    ]
+    for (const [name, value, colour] of rows) {
+      const row = document.createElement('div')
+      row.className = 'tip-row'
+      const label = document.createElement('span')
+      label.className = 'tip-name'
+      const key = document.createElement('i')
+      key.className = 'key-line'
+      key.style.background = colour
+      label.appendChild(key)
+      label.appendChild(document.createTextNode(name))
+      const amount = document.createElement('span')
+      amount.className = 'tip-value'
+      amount.textContent = value
+      row.appendChild(label)
+      row.appendChild(amount)
+      tooltip.appendChild(row)
+    }
+    if (day.isPartial) {
+      const flag = document.createElement('div')
+      flag.className = 'tip-flag'
+      flag.textContent = 'Partial day - collection stopped mid-day'
+      tooltip.appendChild(flag)
+    }
+
+    tooltip.hidden = false
+    const plotRect = svgRequests.getBoundingClientRect()
+    const chartRect = chart.getBoundingClientRect()
+    const pixelX = plotRect.left - chartRect.left + (vbX / VB_W) * plotRect.width
+    const width = tooltip.offsetWidth
+    tooltip.style.left = `${Math.min(Math.max(pixelX - width / 2, 4), chart.clientWidth - width - 4)}px`
+    tooltip.style.top = `${plotRect.top - chartRect.top + 8}px`
+
+    live.textContent = `${chartFullDayFormat.format(trendDate(day))}: ` +
+      `${numberFormat.format(Number(day.count) || 0)} requests, ` +
+      `${numberFormat.format(Number(day.uniqueConnectingIps) || 0)} unique IPs${day.isPartial ? ', partial day' : ''}`
+  }
+
+  chart.addEventListener('pointermove', event => {
+    const days = state.chart.days
+    if (!days.length) return
+    const plotRect = svgRequests.getBoundingClientRect()
+    const vbX = ((event.clientX - plotRect.left) / plotRect.width) * VB_W
+    const index = Math.floor((vbX - CHART_ML) / (CHART_PLOT_W / days.length))
+    if (index < 0 || index >= days.length) return hide()
+    if (index !== active) show(index)
+  })
+  chart.addEventListener('pointerleave', hide)
+  chart.addEventListener('blur', hide)
+  chart.addEventListener('keydown', event => {
+    const last = state.chart.days.length - 1
+    if (last < 0) return
+    if (event.key === 'ArrowRight') { event.preventDefault(); show(Math.min((active < 0 ? -1 : active) + 1, last)) }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); show(Math.max((active < 0 ? last + 1 : active) - 1, 0)) }
+    else if (event.key === 'Home') { event.preventDefault(); show(0) }
+    else if (event.key === 'End') { event.preventDefault(); show(last) }
+    else if (event.key === 'Escape') hide()
+  })
 }
 
 function renderCoverage() {
@@ -327,7 +663,8 @@ function renderBurstGroups() {
 }
 
 function render() {
-  Object.keys(TABLES).forEach(renderTable)
+  Object.keys(TABLES).forEach(name => renderTable(name))
+  renderDailyChart()
   renderBurstGroups()
 }
 
@@ -348,7 +685,12 @@ function exportCsv(name) {
       return csvValue(share.toFixed(4))
     }
     if (column.type === 'trendDelta') return csvValue(trendDelta(row).delta)
-    if (column.type === 'count') return csvValue(Number(row[column.key]) || 0)
+    if (column.type === 'count' || column.type === 'decimal') {
+      const value = row[column.key]
+      if (value === null || value === undefined || value === '') return csvValue('')
+      const numeric = Number(value) || 0
+      return csvValue(column.type === 'decimal' ? numeric.toFixed(2) : numeric)
+    }
     return csvValue(cellText(column, row))
   }).join(',')).join('\r\n')
 
@@ -443,6 +785,18 @@ async function init() {
   const data = await res.json()
   state.data = data
 
+  data.paths ||= []
+  data.connectingIps ||= []
+  data.locations ||= []
+  data.organizations ||= []
+  data.userAgents ||= []
+  data.bursts ||= []
+  data.trend ||= []
+  data.clientFamilies ||= []
+  data.pathDiversity ||= []
+  data.trendingPaths ||= data.trending || []
+  enrichTrend(data)
+
   const total = Number(data.summary?.totalRequests) || 0
   document.getElementById('total-requests').textContent = numberFormat.format(total)
   document.getElementById('unique-ips').textContent = numberFormat.format(data.summary?.uniqueConnectingIps || 0)
@@ -451,7 +805,6 @@ async function init() {
   document.getElementById('burst-count').textContent = numberFormat.format(data.bursts?.length || 0)
 
   renderCoverage()
-  renderDailyChart()
   renderDiversityHighlight()
   document.getElementById('burst-notice').innerHTML =
     `<strong>Review signal:</strong> ${numberFormat.format(data.burstRequestThreshold)} or more requests from the same IP to the same path with the same user agent within ${numberFormat.format(data.burstWindowMinutes)} minutes. A flagged window is an indicator for investigation, not proof of abuse.`
@@ -463,19 +816,9 @@ async function init() {
     render()
   })
 
-  data.paths ||= []
-  data.connectingIps ||= []
-  data.locations ||= []
-  data.organizations ||= []
-  data.userAgents ||= []
-  data.bursts ||= []
-  data.trend ||= []
-  data.clientFamilies ||= []
-  data.pathDiversity ||= []
-  data.trendingPaths ||= data.trending || []
-
   setupExportButtons()
   setupSorting()
+  setupChartInteraction()
   render()
 }
 
