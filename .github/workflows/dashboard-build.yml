@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Test dashboard build
+        working-directory: dashboard
+        run: npm test
+
       - name: Build dashboard data
         working-directory: dashboard
         env:

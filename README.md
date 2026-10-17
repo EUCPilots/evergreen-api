@@ -39,6 +39,12 @@ The [dashboard](dashboard/dist/index.html) groups reports into Traffic, Audience
 
 Use Left/Right Arrow, Home, and End to navigate tabs. Filtering, the low-volume row toggle, sorting, and CSV export remain available for table reports; the daily traffic chart is independent of filtering.
 
+The User agents and Client families tables combine user agents matching `sc<hex>/Sweden`
+(one or more hexadecimal digits) into a single `sc*/Sweden` entry. Request counts are summed,
+and the Client families Variants column retains the number of distinct original user agents.
+Other client families still group by the name before the first `/`. Detailed high-volume
+request windows retain their original user agents.
+
 ## 📊 API Endpoints
 
 | Endpoint | Description | Cache TTL |

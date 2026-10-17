@@ -31,7 +31,7 @@ if (!/^[A-Za-z0-9_]+$/.test(CF_DATASET)) {
 
 // blob1=path, blob2=country, blob3=region, blob4=city, blob5=userAgent,
 // blob6=connectingIp, blob7=asOrganization (see src/index.js logToAnalyticsEngine)
-// trend/clientFamilies/pathDiversity/trending below reuse these same blobs
+// trend/pathDiversity/trending below reuse these same blobs
 if (!API_TEST_USERAGENT) {
   console.warn('API_TEST_USERAGENT is not set; only the built-in known test user agent will be excluded from the dashboard')
 }
@@ -61,6 +61,31 @@ ORDER BY count DESC`
 
 function sqlStringLiteral(value) {
   return `'${String(value).replace(/'/g, "''")}'`
+}
+
+function aggregateUserAgents(rows) {
+  const userAgents = new Map()
+  const clientFamilies = new Map()
+
+  for (const row of rows) {
+    const isSwedenDevice = /^sc[0-9a-fA-F]+\/Sweden(?![\s\S])/.test(row.userAgent)
+    const userAgent = isSwedenDevice ? 'sc*/Sweden' : row.userAgent
+    const family = isSwedenDevice ? 'sc*/Sweden' : row.userAgent.split('/')[0]
+    const count = Number(row.count)
+
+    userAgents.set(userAgent, (userAgents.get(userAgent) || 0) + count)
+    const current = clientFamilies.get(family) || { family, count: 0, variants: 0 }
+    current.count += count
+    current.variants += 1
+    clientFamilies.set(family, current)
+  }
+
+  return {
+    userAgents: Array.from(userAgents, ([userAgent, count]) => ({ userAgent, count }))
+      .sort((a, b) => b.count - a.count),
+    clientFamilies: Array.from(clientFamilies.values())
+      .sort((a, b) => b.count - a.count)
+  }
 }
 
 // Analytics Engine SQL doesn't support subqueries, so this is built from connectingIps results at runtime
@@ -134,14 +159,6 @@ ORDER BY count DESC`,
 ${recentData}
 GROUP BY day
 ORDER BY day ASC`,
-  // Groups the text before the first '/' in the user agent, collapsing noisy version/build suffixes
-  clientFamilies: `SELECT
-  if(position('/' IN blob5) > 0, substring(blob5, 1, position('/' IN blob5) - 1), blob5) AS family,
-  SUM(_sample_interval) AS count,
-  COUNT(DISTINCT blob5) AS variants
-${recentData} AND blob5 != ''
-GROUP BY family
-ORDER BY count DESC`,
   pathDiversity: `SELECT
   blob6 AS connectingIp,
   argMax(blob7, _sample_interval) AS asOrganization,
@@ -234,6 +251,7 @@ async function main() {
     return [name, result.data || []]
   }))
   const data = Object.fromEntries(entries)
+  Object.assign(data, aggregateUserAgents(data.userAgents))
   const summary = data.summary[0] || { totalRequests: 0, uniqueConnectingIps: 0 }
 
   const repeatIps = data.connectingIps.map(row => row.connectingIp)

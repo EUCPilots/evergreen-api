@@ -5,6 +5,7 @@
   "description": "Build script that queries Workers Analytics Engine and generates the static request dashboard.",
   "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test": "node --test build.test.mjs"
   }
 }
