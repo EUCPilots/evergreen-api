@@ -8,8 +8,6 @@ const BURST_REQUEST_THRESHOLD = process.env.BURST_REQUEST_THRESHOLD || '10'
 const PATH_DIVERSITY_THRESHOLD = process.env.PATH_DIVERSITY_THRESHOLD || '5'
 // Same value as the Worker's API_TEST_USERAGENT variable; test traffic is excluded from all aggregates
 const API_TEST_USERAGENT = process.env.API_TEST_USERAGENT || ''
-// Known automated test suite user agent, always excluded regardless of API_TEST_USERAGENT configuration
-const KNOWN_TEST_USERAGENT = 'EvergreenAPI_Tests/1.0.0'
 
 if (!CF_API_TOKEN || !CF_ACCOUNT_ID) {
   console.error('CF_API_TOKEN and CF_ACCOUNT_ID environment variables are required')
@@ -33,13 +31,12 @@ if (!/^[A-Za-z0-9_]+$/.test(CF_DATASET)) {
 // blob6=connectingIp, blob7=asOrganization (see src/index.js logToAnalyticsEngine)
 // trend/pathDiversity/trending below reuse these same blobs
 if (!API_TEST_USERAGENT) {
-  console.warn('API_TEST_USERAGENT is not set; only the built-in known test user agent will be excluded from the dashboard')
+  console.warn('API_TEST_USERAGENT is not set; test traffic will not be excluded from the dashboard')
 }
 
-const excludedTestUserAgents = [...new Set([API_TEST_USERAGENT, KNOWN_TEST_USERAGENT].filter(Boolean))]
-const testUserAgentFilter = excludedTestUserAgents
-  .map(userAgent => `\n  AND blob5 != ${sqlStringLiteral(userAgent)}`)
-  .join('')
+const testUserAgentFilter = API_TEST_USERAGENT
+  ? `\n  AND blob5 != ${sqlStringLiteral(API_TEST_USERAGENT)}`
+  : ''
 
 const recentData = `FROM ${CF_DATASET}
 WHERE timestamp > NOW() - INTERVAL '${lookbackDays}' DAY${testUserAgentFilter}`

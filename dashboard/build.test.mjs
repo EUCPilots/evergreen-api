@@ -19,7 +19,7 @@ async function buildDashboard(userAgents) {
       const userAgents = ${JSON.stringify(userAgents)}
       globalThis.fetch = async (_url, options) => {
         const sql = options.body
-        assert.ok(sql.includes("AND blob5 != 'EvergreenAPI_Tests/1.0.0'"))
+        assert.ok(!sql.includes("AND blob5 != 'EvergreenAPI_Tests/1.0.0'"))
         assert.ok(sql.includes("AND blob5 != 'CustomTests/1.0'"))
         let data = []
         if (sql.startsWith('SELECT blob5 AS userAgent')) data = userAgents
